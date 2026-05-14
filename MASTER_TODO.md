@@ -7,6 +7,7 @@ Use this as the single continuous path through the project. Each step should be 
 - [ ] Only use consent-based data.
 - [ ] Only use synthetic prompts, never real passwords or private text.
 - [ ] Keep raw audio, processed data, and trained models out of Git.
+- [ ] Keep one obvious launcher for each workflow; avoid duplicate scripts that do the same job.
 - [ ] After each milestone, run tests and commit the working state.
 
 ## Continuous Project Path
@@ -51,13 +52,14 @@ Done when: the data collector can load prompts from files instead of using manua
 
 ### 5. Build The Typing Event Collector
 
-- [x] Create a simple local typing interface or command-line collector.
+- [x] Create a simple browser-based local typing collector.
 - [x] Show one prompt at a time.
 - [x] Record each `keydown` event.
 - [x] Record each `keyup` event.
 - [x] Record typed characters.
 - [x] Save participant ID, trial ID, prompt text, typed text, and timestamps.
 - [x] Save each trial as structured metadata beside its matching raw audio and event log.
+- [x] Keep `scripts/collect_trials.py` as the single canonical collector launcher.
 
 Done when: you can type a prompt and get a clean event log with keydown and keyup timestamps.
 
@@ -264,6 +266,7 @@ Done when: someone can read the report and understand what was tested, what work
 - [ ] Update `README.md` with setup instructions.
 - [ ] Update `README.md` with the project workflow.
 - [ ] Make sure all scripts have clear names.
+- [ ] Check for stale duplicate scripts, generated package metadata, and outdated documentation.
 - [ ] Make sure raw data is not tracked.
 - [ ] Run tests.
 - [ ] Commit the final working state.

@@ -516,7 +516,7 @@ keyboard-fusion/
 Useful scripts:
 
 ```text
-collect_trial.py
+collect_trials.py
 extract_keystrokes.py
 make_spectrograms.py
 train_acoustic.py
@@ -643,4 +643,3 @@ The better contribution is:
 ```text
 timing improves acoustic recovery when acoustic predictions are ambiguous
 ```
-

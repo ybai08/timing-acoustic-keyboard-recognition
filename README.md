@@ -75,15 +75,17 @@ acoustic + timing performs better than acoustic-only on the same controlled data
 
 ```text
 configs/                 Experiment settings
-data/raw/                Raw local recordings, ignored by git
+data/raw/                Raw local recordings and per-trial logs, ignored by git
 data/processed/          Processed local features/clips, ignored by git
-data/metadata/           Local metadata/timestamps, ignored by git
+data/metadata/           Future dataset-level indexes/summaries, ignored by git
 models/                  Trained models, ignored by git
 notebooks/               Exploration notebooks
+prompts/                 Synthetic prompt lists used by the collector
 reports/                 Notes, PDFs, and final writeups
 scripts/                 Command-line helper scripts
 src/keyboard_fusion/     Python package source code
 tests/                   Tests
+web/                     Browser UI for foreground data collection
 ```
 
 ## Beginner Setup
@@ -133,6 +135,34 @@ Before recording:
 - avoid real passwords or private text
 
 Raw recordings and processed data are ignored by Git.
+
+## Collector Architecture
+
+There is one collection launcher:
+
+```text
+scripts/collect_trials.py
+```
+
+That launcher starts the local web server in:
+
+```text
+src/keyboard_fusion/web_collection_server.py
+```
+
+The server opens the browser interface in:
+
+```text
+web/collector.html
+```
+
+Shared collection helpers live in:
+
+```text
+src/keyboard_fusion/collection.py
+```
+
+The browser collector is the canonical collection path; there are no duplicate collector launchers.
 
 ## First Milestone
 
