@@ -154,6 +154,8 @@ The server opens the browser interface in:
 
 ```text
 web/collector.html
+web/collector.css
+web/collector.js
 ```
 
 Shared collection helpers live in:

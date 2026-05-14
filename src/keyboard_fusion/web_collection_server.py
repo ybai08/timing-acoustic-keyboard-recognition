@@ -26,6 +26,10 @@ from keyboard_fusion.paths import PROJECT_ROOT, RAW_DATA_DIR
 
 WEB_DIR = PROJECT_ROOT / "web"
 INDEX_PATH = WEB_DIR / "collector.html"
+STATIC_FILES = {
+    "/collector.css": (WEB_DIR / "collector.css", "text/css; charset=utf-8"),
+    "/collector.js": (WEB_DIR / "collector.js", "text/javascript; charset=utf-8"),
+}
 
 
 def find_available_port(preferred_port: int) -> int:
@@ -57,6 +61,10 @@ class CollectorRequestHandler(BaseHTTPRequestHandler):
         if self.path in {"/", "/index.html"}:
             self._send_file(INDEX_PATH, "text/html; charset=utf-8")
             return
+        if self.path in STATIC_FILES:
+            path, content_type = STATIC_FILES[self.path]
+            self._send_file(path, content_type)
+            return
         if self.path == "/api/config":
             self._send_json(
                 {
@@ -71,6 +79,10 @@ class CollectorRequestHandler(BaseHTTPRequestHandler):
     def do_HEAD(self) -> None:
         if self.path in {"/", "/index.html"}:
             self._send_headers_for_file(INDEX_PATH, "text/html; charset=utf-8")
+            return
+        if self.path in STATIC_FILES:
+            path, content_type = STATIC_FILES[self.path]
+            self._send_headers_for_file(path, content_type)
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Not found")
 
