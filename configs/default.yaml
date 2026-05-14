@@ -1,0 +1,22 @@
+project_name: timing_acoustic_keyboard_recognition
+
+audio:
+  sample_rate: 48000
+  channels: 1
+  dtype: float32
+
+segmentation:
+  mode: oracle
+  pre_keydown_ms: 50
+  post_keydown_ms: 250
+
+features:
+  mel_bands: 64
+  fft_window_size: 1024
+  hop_length: 256
+
+experiment:
+  random_seed: 42
+  test_size: 0.2
+  validation_size: 0.2
+

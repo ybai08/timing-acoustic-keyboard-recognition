@@ -1,0 +1,46 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local environment/config
+.env
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data: keep folder structure, not private/raw recordings
+data/raw/*
+data/processed/*
+data/metadata/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/metadata/.gitkeep
+
+# Trained models and generated reports can get large
+models/*
+!models/.gitkeep
+reports/generated/
+
+# Audio and array artifacts
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
