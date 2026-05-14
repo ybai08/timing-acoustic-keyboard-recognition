@@ -185,3 +185,7 @@ acoustic-only vs acoustic+timing comparison
 ## Ethics
 
 Use only consenting participants and synthetic prompts. Do not collect real passwords or private text. This project should be used to measure leakage, understand limitations, and evaluate defenses.
+
+## License
+
+This project is available under the MIT License. See [LICENSE](LICENSE).
