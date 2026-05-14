@@ -6,41 +6,60 @@
   <title>Keyboard Fusion Data Collector</title>
   <style>
     :root {
-      color-scheme: light;
-      --bg: #f6f7f9;
-      --panel: #ffffff;
-      --text: #121826;
-      --muted: #5b6575;
-      --line: #d8dde6;
-      --accent: #0f766e;
-      --danger: #b42318;
-      --shadow: 0 12px 36px rgba(18, 24, 38, 0.08);
+      color-scheme: dark;
+      --bg: #090b10;
+      --panel: #111722;
+      --panel-2: #151d2b;
+      --panel-3: #0d121b;
+      --text: #edf3ff;
+      --muted: #9aa8bc;
+      --subtle: #6f7d91;
+      --line: #263244;
+      --line-strong: #35445b;
+      --accent: #22c7a9;
+      --accent-2: #49a5ff;
+      --danger: #ff5a66;
+      --danger-bg: #32151b;
+      --success-bg: #0f2a25;
+      --shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at top left, rgba(34, 199, 169, 0.12), transparent 28rem),
+        radial-gradient(circle at top right, rgba(73, 165, 255, 0.10), transparent 30rem),
+        var(--bg);
       color: var(--text);
+      min-height: 100vh;
     }
     main {
-      max-width: 1040px;
+      max-width: 1120px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 28px;
     }
     header {
       display: flex;
       justify-content: space-between;
       gap: 16px;
-      align-items: flex-start;
+      align-items: center;
       margin-bottom: 18px;
     }
     h1 {
       margin: 0 0 6px;
-      font-size: 26px;
+      font-size: 28px;
       line-height: 1.2;
     }
     p { margin: 0; color: var(--muted); line-height: 1.45; }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      margin-bottom: 7px;
+      text-transform: uppercase;
+    }
     .grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -51,14 +70,33 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       box-shadow: var(--shadow);
-      padding: 16px;
+      padding: 18px;
       margin-bottom: 14px;
     }
+    .panel.compact { box-shadow: none; background: rgba(17, 23, 34, 0.82); }
+    .prompt-panel {
+      background: linear-gradient(180deg, rgba(21, 29, 43, 0.96), rgba(13, 18, 27, 0.96));
+      border-color: var(--line-strong);
+    }
+    .typing-panel {
+      padding: 0;
+      overflow: hidden;
+    }
+    .typing-header {
+      align-items: center;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      padding: 14px 16px;
+    }
+    .typing-body { padding: 16px; }
     label {
       display: block;
       font-size: 13px;
       font-weight: 700;
       margin-bottom: 6px;
+      color: #cbd7e8;
     }
     input, select, textarea {
       width: 100%;
@@ -67,22 +105,51 @@
       padding: 10px 11px;
       font: inherit;
       color: var(--text);
-      background: #fff;
+      background: var(--panel-3);
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(34, 199, 169, 0.16);
     }
     textarea {
-      min-height: 180px;
+      min-height: 210px;
       resize: vertical;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 17px;
       line-height: 1.45;
     }
+    .meta-strip {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 12px;
+    }
+    .meta-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(13, 18, 27, 0.76);
+      padding: 12px;
+    }
+    .meta-item span {
+      color: var(--subtle);
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .meta-item strong {
+      display: block;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
     .prompt {
-      font-size: 24px;
+      font-size: 30px;
       font-weight: 750;
       letter-spacing: 0;
-      line-height: 1.35;
-      color: #0f172a;
-      margin-top: 8px;
+      line-height: 1.32;
+      color: var(--text);
+      margin-top: 10px;
       overflow-wrap: anywhere;
     }
     .buttons {
@@ -94,48 +161,88 @@
     }
     button {
       border: 1px solid var(--line);
-      background: #fff;
+      background: #192335;
       color: var(--text);
       border-radius: 6px;
       padding: 10px 13px;
       font-weight: 700;
       cursor: pointer;
+      transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
+    }
+    button:hover:not(:disabled) {
+      border-color: var(--line-strong);
+      background: #202c41;
+      transform: translateY(-1px);
     }
     button.primary {
       background: var(--accent);
-      color: #fff;
+      color: #04110e;
       border-color: var(--accent);
     }
+    button.primary:hover:not(:disabled) { background: #38dbc0; }
     button.danger {
       background: var(--danger);
-      color: #fff;
+      color: #210509;
       border-color: var(--danger);
     }
+    button.danger:hover:not(:disabled) { background: #ff727d; }
     button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
     }
     .status {
       min-height: 42px;
       padding: 12px;
       border-radius: 6px;
-      background: #eef8f6;
-      color: #134e4a;
-      border: 1px solid #bfe3dc;
+      background: var(--success-bg);
+      color: #c9fff4;
+      border: 1px solid rgba(34, 199, 169, 0.36);
       line-height: 1.45;
       white-space: pre-wrap;
+    }
+    .status.recording-status {
+      background: var(--danger-bg);
+      border-color: rgba(255, 90, 102, 0.46);
+      color: #ffd1d5;
+    }
+    .pill {
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      display: inline-flex;
+      font-size: 13px;
+      font-weight: 800;
+      gap: 8px;
+      padding: 8px 11px;
+      white-space: nowrap;
+    }
+    .dot {
+      background: var(--subtle);
+      border-radius: 999px;
+      height: 8px;
+      width: 8px;
     }
     .recording {
       color: var(--danger);
       font-weight: 800;
+      border-color: rgba(255, 90, 102, 0.5);
+      background: rgba(255, 90, 102, 0.10);
+    }
+    .recording .dot {
+      background: var(--danger);
+      box-shadow: 0 0 0 5px rgba(255, 90, 102, 0.16);
     }
     .small {
       font-size: 13px;
       color: var(--muted);
     }
     @media (max-width: 760px) {
-      .grid { grid-template-columns: 1fr; }
+      main { padding: 18px; }
+      .grid, .meta-strip { grid-template-columns: 1fr; }
       header { display: block; }
+      .prompt { font-size: 24px; }
     }
   </style>
 </head>
@@ -143,13 +250,14 @@
   <main>
     <header>
       <div>
+        <div class="eyebrow">Foreground Collection</div>
         <h1>Keyboard Fusion Data Collector</h1>
         <p>Foreground-only collector for audio, keydown/keyup logs, and trial metadata.</p>
       </div>
-      <p id="recordingIndicator" class="small">Idle</p>
+      <p id="recordingIndicator" class="pill"><span class="dot"></span><span>Idle</span></p>
     </header>
 
-    <section class="panel">
+    <section class="panel compact">
       <div class="grid">
         <div>
           <label for="participantId">Participant ID</label>
@@ -174,18 +282,37 @@
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel prompt-panel">
       <label>Prompt To Type</label>
       <div id="promptText" class="prompt"></div>
+      <div class="meta-strip">
+        <div class="meta-item">
+          <span>Prompt Set</span>
+          <strong id="promptSetSummary">Loading</strong>
+        </div>
+        <div class="meta-item">
+          <span>Input</span>
+          <strong>Audio + keydown/keyup</strong>
+        </div>
+        <div class="meta-item">
+          <span>Saved Files</span>
+          <strong>WAV, CSV, JSON</strong>
+        </div>
+      </div>
     </section>
 
-    <section class="panel">
-      <label for="typingBox">Type Here During Recording</label>
-      <textarea id="typingBox" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
-      <div class="buttons">
-        <button id="startTrial" class="primary" type="button">Start Trial</button>
-        <button id="stopTrial" class="danger" type="button" disabled>Stop + Save</button>
-        <button id="clearText" type="button">Clear Text</button>
+    <section class="panel typing-panel">
+      <div class="typing-header">
+        <label for="typingBox" style="margin: 0;">Type Here During Recording</label>
+        <p class="small">Only this box is logged</p>
+      </div>
+      <div class="typing-body">
+        <textarea id="typingBox" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        <div class="buttons">
+          <button id="startTrial" class="primary" type="button">Start Trial</button>
+          <button id="stopTrial" class="danger" type="button" disabled>Stop + Save</button>
+          <button id="clearText" type="button">Clear Text</button>
+        </div>
       </div>
     </section>
 
@@ -223,6 +350,7 @@
       participantId: document.getElementById("participantId"),
       sessionId: document.getElementById("sessionId"),
       promptSet: document.getElementById("promptSet"),
+      promptSetSummary: document.getElementById("promptSetSummary"),
       promptIndex: document.getElementById("promptIndex"),
       promptText: document.getElementById("promptText"),
       typingBox: document.getElementById("typingBox"),
@@ -239,6 +367,13 @@
       el.status.textContent = message;
     }
 
+    function setRecordingIndicator(label, isRecording) {
+      const text = el.recordingIndicator.querySelector("span:last-child");
+      text.textContent = label;
+      el.recordingIndicator.classList.toggle("recording", isRecording);
+      el.status.classList.toggle("recording-status", isRecording);
+    }
+
     function currentPrompts() {
       return state.promptSets[state.promptSet] || [""];
     }
@@ -253,6 +388,7 @@
       state.promptIndex = ((state.promptIndex % prompts.length) + prompts.length) % prompts.length;
       el.promptIndex.value = String(state.promptIndex + 1);
       el.promptText.textContent = `${state.promptIndex + 1}/${prompts.length}: ${prompts[state.promptIndex]}`;
+      el.promptSetSummary.textContent = state.promptSet.replaceAll("_", " ");
     }
 
     function sanitizeId(value) {
@@ -356,8 +492,7 @@
       el.stopTrial.disabled = false;
       el.prevPrompt.disabled = true;
       el.nextPrompt.disabled = true;
-      el.recordingIndicator.textContent = "Recording";
-      el.recordingIndicator.classList.add("recording");
+      setRecordingIndicator("Recording", true);
       el.typingBox.focus();
       setStatus("Recording. Type the prompt in the text box, then click Stop + Save.");
     }
@@ -380,8 +515,7 @@
       el.stopTrial.disabled = true;
       el.prevPrompt.disabled = false;
       el.nextPrompt.disabled = false;
-      el.recordingIndicator.textContent = "Idle";
-      el.recordingIndicator.classList.remove("recording");
+      setRecordingIndicator("Idle", false);
 
       if (!state.audioChunks.length) {
         setStatus("No audio was captured. Try again and check microphone permission.");
