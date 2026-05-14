@@ -18,6 +18,59 @@ The repo includes:
 - dependency files
 - beginner setup scripts
 
+## First Experiment Scope
+
+The first experiment is intentionally narrow and controlled. The goal is to build one clean end-to-end version before adding more users, microphones, rooms, or keyboards.
+
+Target device:
+
+```text
+Keyboard/computer: current MacBook Air
+Model identifier: Mac14,2
+Model number: MLY13LL/A
+Chip: Apple M2
+Memory: 8 GB
+```
+
+Recording setup:
+
+```text
+Microphone: Scarlett Solo USB microphone/interface setup
+Microphone configuration: 360-degree/omnidirectional setting
+Mic muffler: none
+Room: user's room only
+Noise control: AC unit off during recording
+```
+
+First-version constraints:
+
+- one participant: the project owner
+- one keyboard: the built-in keyboard on the current MacBook Air
+- one microphone setup: Scarlett Solo USB setup described above
+- one room environment: the user's room with AC off
+- known synthetic prompts only
+- no real passwords or private text
+- audio plus exact keydown/keyup timestamps
+- oracle segmentation first, using the true keydown timestamps to cut clips
+
+First comparison:
+
+```text
+acoustic-only baseline
+vs.
+timing-only baseline
+vs.
+acoustic + timing fusion
+```
+
+First success definition:
+
+```text
+The first version succeeds if it can collect synchronized audio and key timing data,
+train a simple acoustic baseline, compute timing features, and report whether
+acoustic + timing performs better than acoustic-only on the same controlled dataset.
+```
+
 ## Folder Structure
 
 ```text
@@ -69,4 +122,3 @@ acoustic-only vs acoustic+timing comparison
 ## Ethics
 
 Use only consenting participants and synthetic prompts. Do not collect real passwords or private text. This project should be used to measure leakage, understand limitations, and evaluate defenses.
-
