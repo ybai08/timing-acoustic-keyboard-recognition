@@ -6,3 +6,4 @@ Use synthetic prompts only. Do not type real passwords, private messages, accoun
 
 Each non-empty line is treated as one prompt.
 
+For the first experiment, `english_phrases.txt` intentionally uses lowercase letters and spaces only. That keeps the first acoustic/timing dataset focused on common conversation without adding punctuation classes too early.
