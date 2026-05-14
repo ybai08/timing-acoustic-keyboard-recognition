@@ -6,4 +6,111 @@ clean data makes better models
 the model should be tested fairly
 short prompts are easier to debug
 audio and timing are saved together
-
+please type this sentence clearly
+the room should stay quiet today
+small experiments teach useful lessons
+the keyboard rests on the desk
+every trial saves three local files
+the prompt appears before recording
+start the trial before typing
+stop and save after the prompt
+focus on steady natural typing
+do not rush through the phrase
+repeatable methods make results stronger
+simple baselines help catch mistakes
+careful notes make research easier
+the microphone sits near the keyboard
+the air conditioner stays off
+this project uses synthetic text
+never type real private information
+the browser records only this box
+the session id groups related trials
+the participant id stays anonymous
+the status panel shows saved files
+the next prompt loads automatically
+press the keys at a normal pace
+some words are short and common
+other phrases include longer transitions
+the sentence contains several spaces
+natural pauses may reveal rhythm
+good datasets need many examples
+future models will compare timing
+sound alone is only one signal
+timing may help resolve confusion
+nearby keys can sound quite similar
+human typing has repeated habits
+model outputs should include confidence
+the final report should show limits
+we can test defenses later
+white noise may reduce leakage
+keyboard dampening may change sound
+microphone distance matters a lot
+same room recordings are easier
+new sessions test repeatability
+unseen users are harder to model
+unseen keyboards are harder still
+training data should stay organized
+raw recordings should stay local
+processed clips are generated later
+metadata links audio to labels
+timestamps connect sound and keys
+oracle segmentation uses true timing
+automatic segmentation comes after that
+spectrograms turn sound into images
+the acoustic model predicts keys
+the timing model scores transitions
+fusion combines both sources
+top five guesses may still help
+confusion matrices reveal common errors
+validation results guide model choices
+test results should be held back
+the code should remain understandable
+clear folders reduce future confusion
+one launcher avoids duplicate scripts
+public code needs careful documentation
+the license allows broad reuse
+consent is required for collection
+ethical boundaries matter in security
+research should explain its assumptions
+the first experiment stays narrow
+later phases can add complexity
+the desk surface may affect sound
+finger pressure can change acoustics
+longer prompts create richer timing
+short phrases are easier to inspect
+balanced prompt sets avoid bias
+random errors should be investigated
+the model should not memorize noise
+cross session tests are more realistic
+language models must be separate
+timing alone may be weak
+timing can still rank candidates
+acoustic confidence is useful evidence
+save results before changing settings
+commit each working milestone
+tests protect the basic features
+read the logs after each run
+check the waveform before training
+inspect clips before making spectrograms
+the first neural network can be small
+simple convolution layers are enough
+larger models can wait until later
+collect a pilot dataset first
+pilot results reveal broken assumptions
+debugging starts with tiny examples
+make one clean trial work
+then collect a full session
+each trial needs audio and events
+each event needs keydown and keyup
+each clip needs a true label
+the training split should avoid leakage
+trial level splits are safer
+session level splits are stronger
+measure top one and top five
+report character error rate too
+save predictions for later fusion
+the next phase extracts aligned clips
+alignment checks should come before training
+one careful dataset beats a messy one
+the goal is useful measurement
+the system should be reproducible
