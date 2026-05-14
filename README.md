@@ -103,6 +103,37 @@ Optional later, for PyTorch-based acoustic models:
 python -m pip install -r requirements-ml.txt
 ```
 
+## Collecting A Trial
+
+Run the local collection app from the project folder:
+
+```bash
+source .venv/bin/activate
+python scripts/collect_trials.py
+```
+
+The app is intentionally explicit: it only records after you click `Start Trial`, and it only logs keys typed inside the app's typing box.
+
+For each saved trial, the app writes three files under `data/raw/sessions/<session_id>/`:
+
+```text
+trial_001.wav
+trial_001_events.csv
+trial_001_metadata.json
+```
+
+The `.wav` file is the microphone recording. The `_events.csv` file is the digital key log, with rows like "keydown for j at 0.532 seconds" and "keyup for j at 0.612 seconds." The `_metadata.json` file connects the audio and event log to the prompt, participant ID, keyboard, microphone, and room setup.
+
+Before recording:
+
+- connect the Scarlett Solo USB microphone/interface setup
+- confirm the microphone input is selected by macOS if needed
+- turn the AC unit off
+- use only synthetic prompts
+- avoid real passwords or private text
+
+Raw recordings and processed data are ignored by Git.
+
 ## First Milestone
 
 Build one small, controlled experiment:

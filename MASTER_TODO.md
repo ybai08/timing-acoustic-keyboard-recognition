@@ -22,52 +22,52 @@ Done when: the project goal is clear enough that every later task supports the s
 
 ### 2. Finalize The Config File
 
-- [ ] Open `configs/default.yaml`.
-- [ ] Add project-wide settings for sample rate, audio window size, prompt types, random seed, and output folders.
-- [ ] Add acoustic settings for mel bands, FFT window size, hop length, and clip duration.
-- [ ] Add timing settings for dwell time, press-press latency, release-press latency, and release-release latency.
-- [ ] Add evaluation settings for train/test split and metrics.
+- [x] Open `configs/default.yaml`.
+- [x] Add project-wide settings for sample rate, audio window size, prompt types, random seed, and output folders.
+- [x] Add acoustic settings for mel bands, FFT window size, hop length, and clip duration.
+- [x] Add timing settings for dwell time, press-press latency, release-press latency, and release-release latency.
+- [x] Add evaluation settings for train/test split and metrics.
 
 Done when: scripts can read one config file instead of relying on hard-coded experiment values.
 
 ### 3. Make The Setup Check Useful
 
-- [ ] Update `scripts/check_setup.py` so it checks the project folders exist.
-- [ ] Make it check that `configs/default.yaml` can be loaded.
-- [ ] Make it check required packages from `requirements.txt`.
-- [ ] Make it print a simple "ready for data collection" message when setup is valid.
+- [x] Update `scripts/check_setup.py` so it checks the project folders exist.
+- [x] Make it check that `configs/default.yaml` can be loaded.
+- [x] Make it check required packages from `requirements.txt`.
+- [x] Make it print a simple "ready for data collection" message when setup is valid.
 
 Done when: a new user can run one command and know whether the project environment is ready.
 
 ### 4. Create Prompt Lists
 
-- [ ] Create a prompt file for isolated keys.
-- [ ] Create a prompt file for short English phrases.
-- [ ] Create a prompt file for random character strings.
-- [ ] Create a prompt file for synthetic password-like strings.
-- [ ] Add a short note explaining that prompts are synthetic and consent-based.
+- [x] Create a prompt file for isolated keys.
+- [x] Create a prompt file for short English phrases.
+- [x] Create a prompt file for random character strings.
+- [x] Create a prompt file for synthetic password-like strings.
+- [x] Add a short note explaining that prompts are synthetic and consent-based.
 
 Done when: the data collector can load prompts from files instead of using manually typed examples.
 
 ### 5. Build The Typing Event Collector
 
-- [ ] Create a simple local typing interface or command-line collector.
-- [ ] Show one prompt at a time.
-- [ ] Record each `keydown` event.
-- [ ] Record each `keyup` event.
-- [ ] Record typed characters.
-- [ ] Save participant ID, trial ID, prompt text, typed text, and timestamps.
-- [ ] Save each trial as structured metadata in `data/metadata/`.
+- [x] Create a simple local typing interface or command-line collector.
+- [x] Show one prompt at a time.
+- [x] Record each `keydown` event.
+- [x] Record each `keyup` event.
+- [x] Record typed characters.
+- [x] Save participant ID, trial ID, prompt text, typed text, and timestamps.
+- [x] Save each trial as structured metadata beside its matching raw audio and event log.
 
 Done when: you can type a prompt and get a clean event log with keydown and keyup timestamps.
 
 ### 6. Add Audio Recording Or Audio File Linking
 
-- [ ] Decide whether the first version records audio directly or links externally recorded audio.
-- [ ] Add an `audio_file_path` field to each trial metadata record.
-- [ ] Store raw local recordings under `data/raw/`.
-- [ ] Confirm raw audio is ignored by Git.
-- [ ] Add a simple recording checklist for microphone position, room notes, keyboard model, and sample rate.
+- [x] Decide whether the first version records audio directly or links externally recorded audio.
+- [x] Add an `audio_file_path` field to each trial metadata record.
+- [x] Store raw local recordings under `data/raw/`.
+- [x] Confirm raw audio is ignored by Git.
+- [x] Add a simple recording checklist for microphone position, room notes, keyboard model, and sample rate.
 
 Done when: every trial has matching keyboard events and an audio file path.
 
@@ -273,4 +273,4 @@ Done when: the repository is clean, reproducible, and ready to share privately.
 
 ## Current Next Step
 
-- [ ] Start with Step 2: finalize `configs/default.yaml`.
+- [ ] Start with Step 7: add audio/event alignment checks.

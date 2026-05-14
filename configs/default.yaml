@@ -1,9 +1,35 @@
 project_name: timing_acoustic_keyboard_recognition
 
+hardware:
+  keyboard:
+    computer_model: MacBook Air
+    model_identifier: Mac14,2
+    model_number: MLY13LL/A
+    chip: Apple M2
+    memory_gb: 8
+    keyboard_type: built-in laptop keyboard
+  microphone:
+    name: Scarlett Solo USB microphone/interface setup
+    pattern: 360-degree/omnidirectional
+    muffler: none
+
+environment:
+  room: user room
+  ac_unit: off
+  notes: quiet room, controlled first experiment
+
 audio:
   sample_rate: 48000
   channels: 1
   dtype: float32
+
+collection:
+  participant_id_default: p001
+  prompt_directory: prompts
+  raw_session_directory: data/raw/sessions
+  save_audio: true
+  save_events_csv: true
+  save_metadata_json: true
 
 segmentation:
   mode: oracle
@@ -15,8 +41,19 @@ features:
   fft_window_size: 1024
   hop_length: 256
 
+timing_features:
+  dwell_time: true
+  press_press_latency: true
+  release_press_latency: true
+  release_release_latency: true
+  pause_indicators: true
+  keyboard_geometry: true
+
 experiment:
   random_seed: 42
   test_size: 0.2
   validation_size: 0.2
-
+  first_comparison:
+    - acoustic_only
+    - timing_only
+    - acoustic_plus_timing

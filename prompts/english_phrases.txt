@@ -1,0 +1,9 @@
+the quick brown fox
+we need to meet after lunch
+security research requires care
+typing rhythm can reveal patterns
+clean data makes better models
+the model should be tested fairly
+short prompts are easier to debug
+audio and timing are saved together
+

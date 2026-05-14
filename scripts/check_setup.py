@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import platform
 import sys
+from pathlib import Path
 
 
 PACKAGES = [
@@ -16,6 +17,16 @@ PACKAGES = [
     "matplotlib",
     "seaborn",
     "pynput",
+]
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REQUIRED_PATHS = [
+    "configs/default.yaml",
+    "prompts",
+    "data/raw",
+    "data/processed",
+    "data/metadata",
+    "src/keyboard_fusion",
 ]
 
 
@@ -34,6 +45,28 @@ def main() -> int:
             print(f"[MISSING] {package}: {exc}")
             missing.append(package)
 
+    print()
+    for relative_path in REQUIRED_PATHS:
+        path = PROJECT_ROOT / relative_path
+        if path.exists():
+            print(f"[OK] {relative_path}")
+        else:
+            print(f"[MISSING] {relative_path}")
+            missing.append(relative_path)
+
+    print()
+    try:
+        import yaml
+
+        config_path = PROJECT_ROOT / "configs/default.yaml"
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+        sample_rate = config.get("audio", {}).get("sample_rate")
+        microphone = config.get("hardware", {}).get("microphone", {}).get("name", "unknown")
+        print(f"[OK] config loaded: sample_rate={sample_rate}, microphone={microphone}")
+    except Exception as exc:
+        print(f"[MISSING] config could not be loaded: {exc}")
+        missing.append("config")
+
     if missing:
         print()
         print("Some packages are missing. Run:")
@@ -41,10 +74,9 @@ def main() -> int:
         return 1
 
     print()
-    print("Setup looks good.")
+    print("Setup looks good. Ready for prompt/audio collection.")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
