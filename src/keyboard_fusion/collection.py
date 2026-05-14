@@ -66,7 +66,7 @@ def load_prompt_files(prompt_dir: Path | None = None) -> dict[str, list[str]]:
     """Load prompt lists from text files.
 
     Each non-empty, non-comment line is one prompt. The dictionary key is the
-    filename stem, such as "english_phrases".
+    filename stem, such as "random_strings".
     """
     directory = prompt_dir or PROJECT_ROOT / "prompts"
     prompt_sets: dict[str, list[str]] = {}
