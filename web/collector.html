@@ -33,45 +33,64 @@
         var(--bg);
       color: var(--text);
       min-height: 100vh;
+      overflow: hidden;
     }
     main {
       max-width: 1120px;
       margin: 0 auto;
-      padding: 28px;
+      padding: 18px 22px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
     header {
       display: flex;
       justify-content: space-between;
       gap: 16px;
       align-items: center;
-      margin-bottom: 18px;
+      margin-bottom: 12px;
+      flex: 0 0 auto;
     }
     h1 {
       margin: 0 0 6px;
-      font-size: 28px;
+      font-size: 25px;
       line-height: 1.2;
     }
     p { margin: 0; color: var(--muted); line-height: 1.45; }
     .eyebrow {
       color: var(--accent);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 800;
       letter-spacing: 0.08em;
-      margin-bottom: 7px;
+      margin-bottom: 5px;
       text-transform: uppercase;
     }
     .grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
+      gap: 10px;
+    }
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.72fr);
+      gap: 14px;
+      min-height: 0;
+      flex: 1 1 auto;
+    }
+    .left-column,
+    .right-column {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
       box-shadow: var(--shadow);
-      padding: 18px;
-      margin-bottom: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
     }
     .panel.compact { box-shadow: none; background: rgba(17, 23, 34, 0.82); }
     .prompt-panel {
@@ -79,6 +98,11 @@
       border-color: var(--line-strong);
     }
     .typing-panel {
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+      min-height: 0;
+      margin-bottom: 0;
       padding: 0;
       overflow: hidden;
     }
@@ -88,12 +112,18 @@
       border-bottom: 1px solid var(--line);
       display: flex;
       justify-content: space-between;
-      padding: 14px 16px;
+      padding: 11px 13px;
     }
-    .typing-body { padding: 16px; }
+    .typing-body {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 13px;
+      flex: 1 1 auto;
+    }
     label {
       display: block;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       margin-bottom: 6px;
       color: #cbd7e8;
@@ -102,7 +132,7 @@
       width: 100%;
       border: 1px solid var(--line);
       border-radius: 6px;
-      padding: 10px 11px;
+      padding: 8px 10px;
       font: inherit;
       color: var(--text);
       background: var(--panel-3);
@@ -113,43 +143,44 @@
       box-shadow: 0 0 0 3px rgba(34, 199, 169, 0.16);
     }
     textarea {
-      min-height: 210px;
-      resize: vertical;
+      min-height: 160px;
+      resize: none;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 17px;
+      font-size: 16px;
       line-height: 1.45;
+      flex: 1 1 auto;
     }
     .meta-strip {
       display: grid;
-      gap: 10px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      margin-top: 12px;
+      gap: 8px;
+      grid-template-columns: 1fr;
+      margin-top: 10px;
     }
     .meta-item {
       border: 1px solid var(--line);
       border-radius: 8px;
       background: rgba(13, 18, 27, 0.76);
-      padding: 12px;
+      padding: 9px 10px;
     }
     .meta-item span {
       color: var(--subtle);
       display: block;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       margin-bottom: 3px;
     }
     .meta-item strong {
       display: block;
-      font-size: 14px;
+      font-size: 13px;
       overflow-wrap: anywhere;
     }
     .prompt {
-      font-size: 30px;
+      font-size: 26px;
       font-weight: 750;
       letter-spacing: 0;
       line-height: 1.32;
       color: var(--text);
-      margin-top: 10px;
+      margin-top: 8px;
       overflow-wrap: anywhere;
     }
     .buttons {
@@ -157,14 +188,14 @@
       gap: 10px;
       flex-wrap: wrap;
       align-items: center;
-      margin-top: 12px;
+      margin-top: 10px;
     }
     button {
       border: 1px solid var(--line);
       background: #192335;
       color: var(--text);
       border-radius: 6px;
-      padding: 10px 13px;
+      padding: 9px 12px;
       font-weight: 700;
       cursor: pointer;
       transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
@@ -193,7 +224,7 @@
     }
     .status {
       min-height: 42px;
-      padding: 12px;
+      padding: 11px;
       border-radius: 6px;
       background: var(--success-bg);
       color: #c9fff4;
@@ -201,6 +232,7 @@
       line-height: 1.45;
       white-space: pre-wrap;
     }
+    .collector-note { margin-top: 8px; }
     .status.recording-status {
       background: var(--danger-bg);
       border-color: rgba(255, 90, 102, 0.46);
@@ -215,7 +247,7 @@
       font-size: 13px;
       font-weight: 800;
       gap: 8px;
-      padding: 8px 11px;
+      padding: 7px 10px;
       white-space: nowrap;
     }
     .dot {
@@ -239,10 +271,18 @@
       color: var(--muted);
     }
     @media (max-width: 760px) {
-      main { padding: 18px; }
+      body { overflow: auto; }
+      main {
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+        padding: 18px;
+      }
+      .workspace { display: block; }
       .grid, .meta-strip { grid-template-columns: 1fr; }
       header { display: block; }
       .prompt { font-size: 24px; }
+      textarea { min-height: 180px; }
     }
   </style>
 </head>
@@ -257,72 +297,82 @@
       <p id="recordingIndicator" class="pill"><span class="dot"></span><span>Idle</span></p>
     </header>
 
-    <section class="panel compact">
-      <div class="grid">
-        <div>
-          <label for="participantId">Participant ID</label>
-          <input id="participantId" value="p001" autocomplete="off">
-        </div>
-        <div>
-          <label for="sessionId">Session ID</label>
-          <input id="sessionId" autocomplete="off">
-        </div>
-        <div>
-          <label for="promptSet">Prompt Set</label>
-          <select id="promptSet"></select>
-        </div>
-        <div>
-          <label for="promptIndex">Prompt #</label>
-          <input id="promptIndex" value="1" readonly>
-        </div>
-      </div>
-      <div class="buttons">
-        <button id="prevPrompt" type="button">Previous Prompt</button>
-        <button id="nextPrompt" type="button">Next Prompt</button>
-      </div>
-    </section>
+    <div class="workspace">
+      <div class="left-column">
+        <section class="panel compact">
+          <div class="grid">
+            <div>
+              <label for="participantId">Participant ID</label>
+              <input id="participantId" value="p001" autocomplete="off">
+            </div>
+            <div>
+              <label for="sessionId">Session ID</label>
+              <input id="sessionId" autocomplete="off">
+            </div>
+            <div>
+              <label for="promptSet">Prompt Set</label>
+              <select id="promptSet"></select>
+            </div>
+            <div>
+              <label for="promptIndex">Prompt #</label>
+              <input id="promptIndex" value="1" readonly>
+            </div>
+          </div>
+          <div class="buttons">
+            <button id="prevPrompt" type="button">Previous Prompt</button>
+            <button id="nextPrompt" type="button">Next Prompt</button>
+          </div>
+        </section>
 
-    <section class="panel prompt-panel">
-      <label>Prompt To Type</label>
-      <div id="promptText" class="prompt"></div>
-      <div class="meta-strip">
-        <div class="meta-item">
-          <span>Prompt Set</span>
-          <strong id="promptSetSummary">Loading</strong>
-        </div>
-        <div class="meta-item">
-          <span>Input</span>
-          <strong>Audio + keydown/keyup</strong>
-        </div>
-        <div class="meta-item">
-          <span>Saved Files</span>
-          <strong>WAV, CSV, JSON</strong>
-        </div>
-      </div>
-    </section>
+        <section class="panel prompt-panel">
+          <label>Prompt To Type</label>
+          <div id="promptText" class="prompt"></div>
+        </section>
 
-    <section class="panel typing-panel">
-      <div class="typing-header">
-        <label for="typingBox" style="margin: 0;">Type Here During Recording</label>
-        <p class="small">Only this box is logged</p>
+        <section class="panel typing-panel">
+          <div class="typing-header">
+            <label for="typingBox" style="margin: 0;">Type Here During Recording</label>
+            <p class="small">Only this box is logged</p>
+          </div>
+          <div class="typing-body">
+            <textarea id="typingBox" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+            <div class="buttons">
+              <button id="startTrial" class="primary" type="button">Start Trial</button>
+              <button id="stopTrial" class="danger" type="button" disabled>Stop + Save</button>
+              <button id="clearText" type="button">Clear Text</button>
+            </div>
+          </div>
+        </section>
       </div>
-      <div class="typing-body">
-        <textarea id="typingBox" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
-        <div class="buttons">
-          <button id="startTrial" class="primary" type="button">Start Trial</button>
-          <button id="stopTrial" class="danger" type="button" disabled>Stop + Save</button>
-          <button id="clearText" type="button">Clear Text</button>
-        </div>
-      </div>
-    </section>
 
-    <section class="panel">
-      <label>Status</label>
-      <div id="status" class="status">Loading...</div>
-      <p class="small" style="margin-top: 10px;">
-        Use only synthetic prompts. This page records only after Start Trial is clicked and logs only keys typed inside the text box.
-      </p>
-    </section>
+      <div class="right-column">
+        <section class="panel prompt-panel">
+          <label>Session Summary</label>
+          <div class="meta-strip">
+            <div class="meta-item">
+              <span>Prompt Set</span>
+              <strong id="promptSetSummary">Loading</strong>
+            </div>
+            <div class="meta-item">
+              <span>Input</span>
+              <strong>Audio + keydown/keyup</strong>
+            </div>
+            <div class="meta-item">
+              <span>Saved Files</span>
+              <strong>WAV, CSV, JSON</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <label>Status</label>
+          <div id="status" class="status">Loading...</div>
+          <p class="small collector-note">
+            Use only synthetic prompts. This page records only after Start Trial is clicked and logs only keys typed inside the text box.
+          </p>
+        </section>
+      </div>
+    </div>
   </main>
 
   <script>
