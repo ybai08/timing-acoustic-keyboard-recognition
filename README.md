@@ -105,14 +105,14 @@ python -m pip install -r requirements-ml.txt
 
 ## Collecting A Trial
 
-Run the local collection app from the project folder:
+Run the browser-based local collection app from the project folder:
 
 ```bash
 source .venv/bin/activate
-python scripts/collect_trials.py
+python scripts/collect_trials_web.py
 ```
 
-The app is intentionally explicit: it only records after you click `Start Trial`, and it only logs keys typed inside the app's typing box.
+This starts a tiny local server and opens the collector in your browser. The app is intentionally explicit: it only records after you click `Start Trial`, and it only logs keys typed inside the app's typing box.
 
 For each saved trial, the app writes three files under `data/raw/sessions/<session_id>/`:
 
@@ -133,6 +133,8 @@ Before recording:
 - avoid real passwords or private text
 
 Raw recordings and processed data are ignored by Git.
+
+If the older Tkinter desktop app fails with a macOS version error, use the browser-based app above. It avoids the macOS/Tk GUI layer entirely.
 
 ## First Milestone
 

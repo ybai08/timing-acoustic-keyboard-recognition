@@ -94,8 +94,12 @@ def write_events_csv(path: Path, events: Iterable[dict[str, Any]]) -> None:
         "key",
         "char",
         "keysym",
+        "code",
         "keycode",
+        "location",
+        "repeat",
         "timestamp_monotonic",
+        "browser_time_ms",
         "trial_elapsed_seconds",
     ]
     with path.open("w", newline="", encoding="utf-8") as file:
@@ -109,4 +113,3 @@ def write_metadata_json(path: Path, metadata: dict[str, Any]) -> None:
     """Write trial metadata as pretty JSON."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
-
