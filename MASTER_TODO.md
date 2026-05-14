@@ -70,6 +70,7 @@ Done when: you can type a prompt and get a clean event log with keydown and keyu
 - [x] Store raw local recordings under `data/raw/`.
 - [x] Confirm raw audio is ignored by Git.
 - [x] Add a simple recording checklist for microphone position, room notes, keyboard model, and sample rate.
+- [x] Let the browser collector choose and save the recording input device.
 
 Done when: every trial has matching keyboard events and an audio file path.
 

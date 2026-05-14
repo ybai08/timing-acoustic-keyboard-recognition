@@ -86,6 +86,22 @@ p { margin: 0; color: var(--muted); line-height: 1.45; }
   margin-bottom: 12px;
 }
 .panel.compact { box-shadow: none; background: rgba(17, 23, 34, 0.82); }
+.device-panel {
+  background: rgba(17, 23, 34, 0.82);
+  box-shadow: none;
+}
+.device-header {
+  align-items: flex-end;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.device-header label { margin-bottom: 3px; }
+.device-hint {
+  line-height: 1.35;
+  margin-top: 7px;
+}
 .prompt-panel {
   background: linear-gradient(180deg, rgba(21, 29, 43, 0.96), rgba(13, 18, 27, 0.96));
   border-color: var(--line-strong);
@@ -192,6 +208,11 @@ button {
   font-weight: 700;
   cursor: pointer;
   transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
+}
+button.small-button {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  white-space: nowrap;
 }
 button:hover:not(:disabled) {
   border-color: var(--line-strong);

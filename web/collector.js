@@ -10,6 +10,11 @@ const state = {
   processorNode: null,
   muteNode: null,
   audioChunks: [],
+  audioDevices: [],
+  selectedAudioDeviceId: "",
+  requestedAudioDevice: null,
+  activeAudioDevice: null,
+  activeAudioTrackSettings: {},
   sampleRate: 48000,
   trialStartPerf: 0,
   startedAt: "",
@@ -23,6 +28,10 @@ const el = {
   sessionId: document.getElementById("sessionId"),
   promptSet: document.getElementById("promptSet"),
   promptSetSummary: document.getElementById("promptSetSummary"),
+  audioInput: document.getElementById("audioInput"),
+  audioInputSummary: document.getElementById("audioInputSummary"),
+  audioInputHint: document.getElementById("audioInputHint"),
+  refreshAudioInputs: document.getElementById("refreshAudioInputs"),
   promptIndex: document.getElementById("promptIndex"),
   promptText: document.getElementById("promptText"),
   typingBox: document.getElementById("typingBox"),
@@ -66,6 +75,143 @@ function refreshPrompt() {
 function sanitizeId(value) {
   const cleaned = value.trim().replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
   return cleaned || "unknown";
+}
+
+function audioApisAvailable() {
+  return Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && navigator.mediaDevices.enumerateDevices);
+}
+
+function audioDeviceLabel(device, index) {
+  if (device && device.label) return device.label;
+  if (device && device.deviceId === "default") return "Default microphone";
+  return `Microphone ${index + 1}`;
+}
+
+function audioDeviceInfo(deviceId) {
+  const index = state.audioDevices.findIndex((device) => device.deviceId === deviceId);
+  const device = index >= 0 ? state.audioDevices[index] : null;
+  if (!device) {
+    return {
+      device_id: deviceId || "",
+      group_id: "",
+      label: deviceId ? "Selected microphone" : "Default browser microphone",
+    };
+  }
+  return {
+    device_id: device.deviceId,
+    group_id: device.groupId || "",
+    label: audioDeviceLabel(device, index),
+  };
+}
+
+function updateAudioInputSummary() {
+  if (!state.audioDevices.length) {
+    el.audioInputSummary.textContent = "No microphone detected";
+    return;
+  }
+  el.audioInputSummary.textContent = audioDeviceInfo(state.selectedAudioDeviceId).label;
+}
+
+function setAudioInputControlsEnabled(enabled) {
+  el.audioInput.disabled = !enabled || !state.audioDevices.length;
+  el.refreshAudioInputs.disabled = !enabled;
+}
+
+function renderAudioDevices() {
+  el.audioInput.innerHTML = "";
+
+  if (!state.audioDevices.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No audio inputs found";
+    el.audioInput.appendChild(option);
+    el.audioInputHint.textContent = "Connect a microphone, then click Allow / Refresh.";
+    setAudioInputControlsEnabled(!state.recording);
+    updateAudioInputSummary();
+    return;
+  }
+
+  state.audioDevices.forEach((device, index) => {
+    const option = document.createElement("option");
+    option.value = device.deviceId;
+    option.textContent = audioDeviceLabel(device, index);
+    el.audioInput.appendChild(option);
+  });
+  el.audioInput.value = state.selectedAudioDeviceId;
+
+  const labelsVisible = state.audioDevices.some((device) => device.label);
+  el.audioInputHint.textContent = labelsVisible
+    ? "Recording will use the selected input."
+    : "Device names may appear after microphone access is allowed.";
+  setAudioInputControlsEnabled(!state.recording);
+  updateAudioInputSummary();
+}
+
+async function askForAudioDevicePermission() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  for (const track of stream.getTracks()) track.stop();
+}
+
+async function refreshAudioInputs({ requestPermission = false, showStatus = false, preferredDeviceId = "" } = {}) {
+  if (!audioApisAvailable()) {
+    state.audioDevices = [];
+    el.audioInput.innerHTML = '<option value="">Audio device selection unsupported</option>';
+    el.audioInputHint.textContent = "This browser cannot list microphone inputs.";
+    setAudioInputControlsEnabled(false);
+    updateAudioInputSummary();
+    return;
+  }
+  if (state.recording) return;
+
+  let permissionError = null;
+  if (requestPermission) {
+    try {
+      await askForAudioDevicePermission();
+    } catch (error) {
+      permissionError = error;
+    }
+  }
+
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  state.audioDevices = devices.filter((device) => device.kind === "audioinput");
+  const currentDeviceId = preferredDeviceId || state.selectedAudioDeviceId || el.audioInput.value;
+  const currentStillAvailable = state.audioDevices.some((device) => device.deviceId === currentDeviceId);
+  state.selectedAudioDeviceId = currentStillAvailable
+    ? currentDeviceId
+    : (state.audioDevices[0] ? state.audioDevices[0].deviceId : "");
+  renderAudioDevices();
+
+  if (showStatus && permissionError) {
+    setStatus(`Could not access microphone devices.\n${permissionError.message}`);
+  } else if (showStatus && state.audioDevices.length) {
+    setStatus(`Audio inputs refreshed. Selected: ${audioDeviceInfo(state.selectedAudioDeviceId).label}`);
+  }
+}
+
+function buildAudioConstraints(audioConfig) {
+  const constraints = {
+    channelCount: Number(audioConfig.channels || 1),
+    sampleRate: Number(audioConfig.sample_rate || 48000),
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+  };
+  if (state.selectedAudioDeviceId) {
+    constraints.deviceId = { exact: state.selectedAudioDeviceId };
+  }
+  return constraints;
+}
+
+function summarizeTrackSettings(settings) {
+  return {
+    device_id: settings.deviceId || "",
+    group_id: settings.groupId || "",
+    sample_rate: settings.sampleRate || null,
+    channel_count: settings.channelCount || null,
+    echo_cancellation: settings.echoCancellation ?? null,
+    noise_suppression: settings.noiseSuppression ?? null,
+    auto_gain_control: settings.autoGainControl ?? null,
+  };
 }
 
 async function loadConfig() {
@@ -125,19 +271,25 @@ async function startTrial() {
   state.audioChunks = [];
   state.keyStacks = new Map();
   state.nextEventIndex = 0;
+  state.requestedAudioDevice = null;
+  state.activeAudioDevice = null;
+  state.activeAudioTrackSettings = {};
 
   try {
     const audioConfig = state.config.audio || {};
     const requestedSampleRate = Number(audioConfig.sample_rate || 48000);
+    state.requestedAudioDevice = audioDeviceInfo(state.selectedAudioDeviceId);
     state.mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: Number(audioConfig.channels || 1),
-        sampleRate: requestedSampleRate,
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      }
+      audio: buildAudioConstraints(audioConfig),
     });
+    const audioTrack = state.mediaStream.getAudioTracks()[0];
+    const trackSettings = audioTrack && audioTrack.getSettings ? audioTrack.getSettings() : {};
+    state.activeAudioTrackSettings = summarizeTrackSettings(trackSettings);
+    if (trackSettings.deviceId) {
+      state.selectedAudioDeviceId = trackSettings.deviceId;
+      await refreshAudioInputs({ preferredDeviceId: trackSettings.deviceId }).catch(() => {});
+    }
+    state.activeAudioDevice = audioDeviceInfo(trackSettings.deviceId || state.selectedAudioDeviceId);
     state.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: requestedSampleRate });
     state.sampleRate = state.audioContext.sampleRate;
     state.sourceNode = state.audioContext.createMediaStreamSource(state.mediaStream);
@@ -164,9 +316,10 @@ async function startTrial() {
   el.stopTrial.disabled = false;
   el.prevPrompt.disabled = true;
   el.nextPrompt.disabled = true;
+  setAudioInputControlsEnabled(false);
   setRecordingIndicator("Recording", true);
   el.typingBox.focus();
-  setStatus("Recording. Type the prompt in the text box, then click Stop + Save.");
+  setStatus(`Recording from ${state.activeAudioDevice.label}. Type the prompt in the text box, then click Stop + Save.`);
 }
 
 async function stopAndSave() {
@@ -182,11 +335,17 @@ async function stopAndSave() {
     for (const track of state.mediaStream.getTracks()) track.stop();
   }
   if (state.audioContext) await state.audioContext.close();
+  state.mediaStream = null;
+  state.audioContext = null;
+  state.sourceNode = null;
+  state.processorNode = null;
+  state.muteNode = null;
 
   el.startTrial.disabled = false;
   el.stopTrial.disabled = true;
   el.prevPrompt.disabled = false;
   el.nextPrompt.disabled = false;
+  setAudioInputControlsEnabled(true);
   setRecordingIndicator("Idle", false);
 
   if (!state.audioChunks.length) {
@@ -210,6 +369,11 @@ async function stopAndSave() {
     sample_rate: state.sampleRate,
     channels: 1,
     audio_frame_count: samples.length,
+    audio_input_device: {
+      requested: state.requestedAudioDevice,
+      active: state.activeAudioDevice,
+      track_settings: state.activeAudioTrackSettings,
+    },
     audio_base64: audioBase64,
     events: state.events,
   };
@@ -300,9 +464,28 @@ el.nextPrompt.addEventListener("click", () => {
 el.clearText.addEventListener("click", () => {
   if (!state.recording) el.typingBox.value = "";
 });
+el.audioInput.addEventListener("change", () => {
+  state.selectedAudioDeviceId = el.audioInput.value;
+  updateAudioInputSummary();
+});
+el.refreshAudioInputs.addEventListener("click", () => {
+  refreshAudioInputs({ requestPermission: true, showStatus: true })
+    .catch((error) => setStatus(`Could not refresh audio inputs.\n${error.message}`));
+});
 el.startTrial.addEventListener("click", startTrial);
 el.stopTrial.addEventListener("click", stopAndSave);
 el.typingBox.addEventListener("keydown", (event) => recordKeyEvent(event, "keydown"));
 el.typingBox.addEventListener("keyup", (event) => recordKeyEvent(event, "keyup"));
 
-loadConfig().catch((error) => setStatus(`Startup failed: ${error.message}`));
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener("devicechange", () => {
+    refreshAudioInputs().catch(() => {});
+  });
+}
+
+async function startup() {
+  await loadConfig();
+  await refreshAudioInputs();
+}
+
+startup().catch((error) => setStatus(`Startup failed: ${error.message}`));

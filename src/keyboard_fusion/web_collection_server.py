@@ -141,6 +141,7 @@ class CollectorRequestHandler(BaseHTTPRequestHandler):
             "events_file_path": paths.events_path.name,
             "sample_rate": payload.get("sample_rate"),
             "channels": payload.get("channels", 1),
+            "audio_input_device": payload.get("audio_input_device") or {},
             "event_count": len(events),
             "audio_frame_count": payload.get("audio_frame_count"),
             "keyboard": self.server.project_config.get("hardware", {}).get("keyboard", {}),

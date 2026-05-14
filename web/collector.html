@@ -66,6 +66,20 @@
       </div>
 
       <div class="right-column">
+        <section class="panel device-panel">
+          <div class="device-header">
+            <div>
+              <label for="audioInput">Recording Input</label>
+              <p class="small">Choose the microphone before starting.</p>
+            </div>
+            <button id="refreshAudioInputs" class="small-button" type="button">Allow / Refresh</button>
+          </div>
+          <select id="audioInput">
+            <option value="">Loading inputs...</option>
+          </select>
+          <p id="audioInputHint" class="small device-hint">Waiting for browser microphone access.</p>
+        </section>
+
         <section class="panel prompt-panel">
           <label>Session Summary</label>
           <div class="meta-strip">
@@ -75,7 +89,7 @@
             </div>
             <div class="meta-item">
               <span>Input</span>
-              <strong>Audio + keydown/keyup</strong>
+              <strong id="audioInputSummary">Choose microphone</strong>
             </div>
             <div class="meta-item">
               <span>Saved Files</span>
