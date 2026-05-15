@@ -111,12 +111,14 @@ Done when: every extracted keystroke clip can become a model-ready spectrogram.
 ### 10. Train The First Acoustic Baseline
 
 - [x] Create `src/keyboard_fusion/acoustic_model.py`.
+- [x] Create `src/keyboard_fusion/acoustic_cnn.py` for the optimized acoustic-only neural network.
 - [x] Start with a small CNN or simple classical baseline before using larger models.
 - [x] Train on isolated-key spectrograms.
 - [x] Output probability scores for every possible key.
 - [x] Save model outputs for each test clip.
 - [x] Report top-1 and top-5 key accuracy.
 - [x] Add a browser visualization for the acoustic baseline structure and learned weights.
+- [x] Add an optimized acoustic CNN with class balancing, augmentation, validation, and early stopping.
 
 Done when: the project has an acoustic-only baseline with saved per-key probabilities.
 
@@ -191,11 +193,11 @@ Done when: the project can measure how much performance drops when true timestam
 
 ### 17. Add Better Acoustic Models
 
-- [ ] Compare the simple CNN against a stronger model.
-- [ ] Try a ResNet-style model or CoAtNet-style model.
-- [ ] Keep the same train/test splits.
-- [ ] Save the same probability output format.
-- [ ] Compare accuracy, training time, and confusion patterns.
+- [x] Compare the simple baseline against a stronger model.
+- [x] Try a ResNet-style model or CoAtNet-style model.
+- [x] Keep the same train/test splits.
+- [x] Save the same probability output format.
+- [x] Compare accuracy, training time, and confusion patterns.
 
 Done when: the project knows whether a stronger acoustic model changes the value of timing fusion.
 

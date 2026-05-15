@@ -99,7 +99,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-Optional later, for PyTorch-based acoustic models:
+For the optimized acoustic CNN, install the ML add-on:
 
 ```bash
 python -m pip install -r requirements-ml.txt
@@ -207,7 +207,7 @@ spectrogram_preview.html
 
 Each `.npz` file contains `spectrogram`, the normalized model input, and `log_mel`, the unnormalized log-mel values. Open the preview HTML to choose a trial and inspect every generated waveform and spectrogram pair for that trial; the yellow vertical line marks the logged keydown position inside each clip.
 
-## Training The First Acoustic Baseline
+## Training Acoustic Models
 
 After generating spectrograms, run:
 
@@ -218,6 +218,15 @@ python scripts/train_acoustic_baseline.py
 
 This trains the first acoustic-only baseline: logistic regression on flattened normalized log-mel spectrograms. It is intentionally simple so you can measure the pipeline before adding a neural network.
 
+For the stronger acoustic-only model, run:
+
+```bash
+source .venv/bin/activate
+python scripts/train_acoustic_cnn.py
+```
+
+This trains a compact ResNet-style CNN directly on the `64 x 10` log-mel spectrograms. It uses class-balanced loss, light SpecAugment-style frequency/time masking, small noise augmentation, AdamW, a validation split, and early stopping. This is the best acoustic-only model currently in the project; timing and fusion are still separate future steps.
+
 Model outputs are written under `models/acoustic_baseline/<session_id>/`:
 
 ```text
@@ -225,6 +234,17 @@ model.joblib
 metrics.json
 test_predictions.csv
 test_probabilities.csv
+report.txt
+```
+
+CNN outputs are written under `models/acoustic_cnn/<session_id>/`:
+
+```text
+model.pt
+metrics.json
+test_predictions.csv
+test_probabilities.csv
+training_history.csv
 report.txt
 ```
 

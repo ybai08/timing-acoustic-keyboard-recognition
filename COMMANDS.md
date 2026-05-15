@@ -154,6 +154,7 @@ python scripts/align_trials.py --session session_20260514_185847
 python scripts/extract_clips.py --session session_20260514_185847
 python scripts/generate_spectrograms.py --session session_20260514_185847 --preview-count 0
 python scripts/train_acoustic_baseline.py --session session_20260514_185847
+python scripts/train_acoustic_cnn.py --session session_20260514_185847
 open "data/processed/spectrograms/session_20260514_185847/spectrogram_preview.html"
 ```
 
@@ -196,6 +197,46 @@ models/acoustic_baseline/<session_id>/report.txt
 ```
 
 The first acoustic baseline is logistic regression on flattened normalized log-mel spectrograms. It is intentionally simple: the purpose is to get a real acoustic-only measuring stick before building a neural network. The `test_predictions.csv` file gives top-1 and top-5 guesses for each held-out clip. The `test_probabilities.csv` file gives one probability per candidate key for each held-out clip.
+
+## Train The Optimized Acoustic CNN
+
+Install the ML dependency once:
+
+```bash
+python -m pip install -r requirements-ml.txt
+```
+
+Train the optimized acoustic-only CNN on the latest spectrogram session:
+
+```bash
+python scripts/train_acoustic_cnn.py
+```
+
+Train on a specific spectrogram session:
+
+```bash
+python scripts/train_acoustic_cnn.py --session session_20260514_185847
+```
+
+Useful tuning flags:
+
+```bash
+python scripts/train_acoustic_cnn.py --session session_20260514_185847 --epochs 220 --patience 35 --batch-size 64
+python scripts/train_acoustic_cnn.py --session session_20260514_185847 --device cpu
+```
+
+What it creates:
+
+```text
+models/acoustic_cnn/<session_id>/model.pt
+models/acoustic_cnn/<session_id>/metrics.json
+models/acoustic_cnn/<session_id>/test_predictions.csv
+models/acoustic_cnn/<session_id>/test_probabilities.csv
+models/acoustic_cnn/<session_id>/training_history.csv
+models/acoustic_cnn/<session_id>/report.txt
+```
+
+The optimized acoustic model is a compact ResNet-style CNN over the `64 x 10` spectrogram image. It uses class-balanced loss, light SpecAugment-style masking, small noise augmentation, AdamW, validation, and early stopping. This stays acoustic-only; it does not use timing or fusion features.
 
 ## Visualize The Acoustic Model
 
