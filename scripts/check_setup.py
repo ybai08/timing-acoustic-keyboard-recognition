@@ -18,6 +18,9 @@ PACKAGES = [
     "seaborn",
     "pynput",
 ]
+OPTIONAL_ML_PACKAGES = [
+    "torch",
+]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_PATHS = [
@@ -44,6 +47,15 @@ def main() -> int:
         except Exception as exc:  # pragma: no cover - setup diagnostic
             print(f"[MISSING] {package}: {exc}")
             missing.append(package)
+
+    print()
+    for package in OPTIONAL_ML_PACKAGES:
+        try:
+            module = importlib.import_module(package)
+            version = getattr(module, "__version__", "installed")
+            print(f"[OK] optional ML {package}: {version}")
+        except Exception:
+            print(f"[OPTIONAL] {package}: install with `python -m pip install -r requirements-ml.txt` for CNN training")
 
     print()
     for relative_path in REQUIRED_PATHS:

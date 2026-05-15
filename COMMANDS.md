@@ -160,7 +160,7 @@ open "data/processed/spectrograms/session_20260514_185847/spectrogram_preview.ht
 
 Replace `session_20260514_185847` with your actual session folder name.
 
-## Training
+## Train The Logistic Acoustic Baseline
 
 Train the first acoustic-only baseline on the latest spectrogram session:
 
@@ -238,7 +238,7 @@ models/acoustic_cnn/<session_id>/report.txt
 
 The optimized acoustic model is a compact ResNet-style CNN over the `64 x 10` spectrogram image. It uses class-balanced loss, light SpecAugment-style masking, small noise augmentation, AdamW, validation, and early stopping. This stays acoustic-only; it does not use timing or fusion features.
 
-## Visualize The Acoustic Model
+## Visualize The Logistic Acoustic Baseline
 
 Generate a browser-based model visualization for the latest acoustic baseline:
 
@@ -258,7 +258,7 @@ Open the visualization:
 open "models/acoustic_baseline/session_20260514_185847/model_visualization.html"
 ```
 
-The current acoustic baseline is not a neural network. Its structure is:
+This viewer is for the logistic-regression baseline, not the CNN. Its structure is:
 
 ```text
 64 x 10 log-mel spectrogram
@@ -268,4 +268,13 @@ The current acoustic baseline is not a neural network. Its structure is:
 -> one probability for each key class
 ```
 
-For the current session, that means `640` input features, `0` hidden neurons, `22` output key classes, and `14,102` trainable weights/intercepts. The visualization shows this structure, a per-key learned weight heatmap, a confusion matrix, and held-out prediction probabilities.
+The visualization shows this structure, a per-key learned weight heatmap, a confusion matrix, and held-out prediction probabilities.
+
+For the optimized CNN, inspect these files instead:
+
+```text
+models/acoustic_cnn/<session_id>/metrics.json
+models/acoustic_cnn/<session_id>/training_history.csv
+models/acoustic_cnn/<session_id>/test_predictions.csv
+models/acoustic_cnn/<session_id>/report.txt
+```

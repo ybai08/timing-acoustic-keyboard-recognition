@@ -108,7 +108,7 @@ Done when: known keydown timestamps can produce labeled single-key audio clips.
 
 Done when: every extracted keystroke clip can become a model-ready spectrogram.
 
-### 10. Train The First Acoustic Baseline
+### 10. Train Acoustic-Only Models
 
 - [x] Create `src/keyboard_fusion/acoustic_model.py`.
 - [x] Create `src/keyboard_fusion/acoustic_cnn.py` for the optimized acoustic-only neural network.
@@ -120,7 +120,7 @@ Done when: every extracted keystroke clip can become a model-ready spectrogram.
 - [x] Add a browser visualization for the acoustic baseline structure and learned weights.
 - [x] Add an optimized acoustic CNN with class balancing, augmentation, validation, and early stopping.
 
-Done when: the project has an acoustic-only baseline with saved per-key probabilities.
+Done when: the project has acoustic-only models with saved per-key probabilities.
 
 ### 11. Expand Timing Feature Extraction
 
@@ -199,7 +199,7 @@ Done when: the project can measure how much performance drops when true timestam
 - [x] Save the same probability output format.
 - [x] Compare accuracy, training time, and confusion patterns.
 
-Done when: the project knows whether a stronger acoustic model changes the value of timing fusion.
+Done when: the project knows whether a stronger acoustic model improves the acoustic-only baseline before timing fusion.
 
 ### 18. Add A Language Model As A Separate Experiment
 
@@ -270,17 +270,17 @@ Done when: someone can read the report and understand what was tested, what work
 
 ### 24. Package The Project
 
-- [ ] Update `README.md` with setup instructions.
-- [ ] Update `README.md` with the project workflow.
-- [ ] Make sure all scripts have clear names.
-- [ ] Check for stale duplicate scripts, generated package metadata, and outdated documentation.
-- [ ] Make sure raw data is not tracked.
-- [ ] Run tests.
-- [ ] Commit the final working state.
-- [ ] Push to GitHub.
+- [x] Update `README.md` with setup instructions.
+- [x] Update `README.md` with the project workflow.
+- [x] Make sure all scripts have clear names.
+- [x] Check for stale duplicate scripts, generated package metadata, and outdated documentation.
+- [x] Make sure raw data is not tracked.
+- [x] Run tests.
+- [x] Commit the final working state.
+- [x] Push to GitHub.
 
 Done when: the repository is clean, reproducible, and ready to share privately.
 
 ## Current Next Step
 
-- [ ] Start with Step 10: train the first acoustic-only baseline.
+- [ ] Start Step 11: expand timing feature extraction.

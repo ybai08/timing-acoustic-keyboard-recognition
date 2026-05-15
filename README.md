@@ -8,14 +8,14 @@ The initial research question is:
 
 ## Project Status
 
-Current stage: data collection, spectrogram generation, and first acoustic-only baseline.
+Current stage: data collection, spectrogram generation, logistic acoustic baseline, and optimized acoustic-only CNN are working. The next major research step is timing feature extraction.
 
 The repo includes:
 
 - a step-by-step implementation plan as Markdown and PDF
 - a clean folder structure for data, models, reports, scripts, and source code
-- starter Python package files
-- dependency files
+- Python package code for collection, alignment, clipping, spectrograms, and acoustic models
+- dependency files for the base pipeline and optional PyTorch CNN training
 - beginner setup scripts
 
 ## First Experiment Scope
@@ -67,8 +67,8 @@ First success definition:
 
 ```text
 The first version succeeds if it can collect synchronized audio and key timing data,
-train a simple acoustic baseline, compute timing features, and report whether
-acoustic + timing performs better than acoustic-only on the same controlled dataset.
+train acoustic-only models, compute timing features, and report whether acoustic +
+timing performs better than acoustic-only on the same controlled dataset.
 ```
 
 ## Folder Structure
@@ -79,9 +79,7 @@ data/raw/                Raw local recordings and per-trial logs, ignored by git
 data/processed/          Processed local features/clips, ignored by git
 data/metadata/           Future dataset-level indexes/summaries, ignored by git
 models/                  Trained models, ignored by git
-notebooks/               Exploration notebooks
 prompts/                 Synthetic prompt lists used by the collector
-reports/                 Notes, PDFs, and final writeups
 scripts/                 Command-line helper scripts
 src/keyboard_fusion/     Python package source code
 tests/                   Tests
@@ -250,14 +248,14 @@ report.txt
 
 The predictions file contains top-1 and top-5 guesses for each held-out clip. The probabilities file contains one probability per candidate key for each held-out clip.
 
-To visualize the trained baseline, run:
+To visualize the trained logistic-regression baseline, run:
 
 ```bash
 python scripts/visualize_acoustic_model.py
 open "models/acoustic_baseline/<session_id>/model_visualization.html"
 ```
 
-The viewer shows the model structure, learned per-key acoustic weights, a confusion matrix, and held-out prediction probabilities.
+The viewer shows the logistic model structure, learned per-key acoustic weights, a confusion matrix, and held-out prediction probabilities. The CNN currently writes `metrics.json`, `training_history.csv`, `test_predictions.csv`, `test_probabilities.csv`, and `report.txt`.
 
 ## Collector Architecture
 
@@ -301,6 +299,7 @@ known prompts
 audio + key timestamps
 oracle segmentation
 simple acoustic classifier
+optimized acoustic-only CNN
 timing features
 acoustic-only vs acoustic+timing comparison
 ```
