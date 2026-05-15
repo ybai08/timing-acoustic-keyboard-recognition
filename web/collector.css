@@ -231,6 +231,14 @@ button.danger {
   border-color: var(--danger);
 }
 button.danger:hover:not(:disabled) { background: #ff727d; }
+button.subtle-danger {
+  background: var(--danger-bg);
+  color: #ffd1d5;
+  border-color: rgba(255, 90, 102, 0.48);
+}
+button.subtle-danger:hover:not(:disabled) {
+  background: #4a1c24;
+}
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

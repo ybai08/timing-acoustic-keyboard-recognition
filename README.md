@@ -128,6 +128,8 @@ trial_001_metadata.json
 
 The `.wav` file is the microphone recording. The `_events.csv` file is the digital key log, with rows like "keydown for j at 0.532 seconds" and "keyup for j at 0.612 seconds." The `_metadata.json` file connects the audio and event log to the prompt, participant ID, keyboard, microphone, browser-selected audio input, and room setup.
 
+After a trial is saved, the typing box clears automatically. If you notice a bad take right away, use `Delete trial_###` to remove the last saved trial's raw WAV, event CSV, and metadata JSON files, then retry the same prompt.
+
 Before recording:
 
 - connect the Scarlett Solo USB microphone/interface setup

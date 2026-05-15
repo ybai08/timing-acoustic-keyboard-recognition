@@ -59,6 +59,7 @@ Done when: the data collector can load prompts from files instead of using manua
 - [x] Record typed characters.
 - [x] Save participant ID, trial ID, prompt text, typed text, and timestamps.
 - [x] Save each trial as structured metadata beside its matching raw audio and event log.
+- [x] Let the collector delete the last saved trial after a bad take.
 - [x] Keep `scripts/collect_trials.py` as the single canonical collector launcher.
 
 Done when: you can type a prompt and get a clean event log with keydown and keyup timestamps.

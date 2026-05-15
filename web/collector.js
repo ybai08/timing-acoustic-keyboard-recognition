@@ -15,6 +15,9 @@ const state = {
   requestedAudioDevice: null,
   activeAudioDevice: null,
   activeAudioTrackSettings: {},
+  savingTrial: false,
+  deletingTrial: false,
+  lastSavedTrial: null,
   sampleRate: 48000,
   trialStartPerf: 0,
   startedAt: "",
@@ -38,6 +41,7 @@ const el = {
   startTrial: document.getElementById("startTrial"),
   stopTrial: document.getElementById("stopTrial"),
   clearText: document.getElementById("clearText"),
+  deleteLastTrial: document.getElementById("deleteLastTrial"),
   prevPrompt: document.getElementById("prevPrompt"),
   nextPrompt: document.getElementById("nextPrompt"),
   status: document.getElementById("status"),
@@ -53,6 +57,13 @@ function setRecordingIndicator(label, isRecording) {
   text.textContent = label;
   el.recordingIndicator.classList.toggle("recording", isRecording);
   el.status.classList.toggle("recording-status", isRecording);
+}
+
+function updateDeleteLastTrialButton() {
+  const trial = state.lastSavedTrial;
+  const canDelete = Boolean(trial && !state.recording && !state.savingTrial && !state.deletingTrial);
+  el.deleteLastTrial.disabled = !canDelete;
+  el.deleteLastTrial.textContent = trial ? `Delete ${trial.trial_id}` : "Delete Last Trial";
 }
 
 function currentPrompts() {
@@ -318,6 +329,7 @@ async function startTrial() {
   el.nextPrompt.disabled = true;
   setAudioInputControlsEnabled(false);
   setRecordingIndicator("Recording", true);
+  updateDeleteLastTrialButton();
   el.typingBox.focus();
   setStatus(`Recording from ${state.activeAudioDevice.label}. Type the prompt in the text box, then click Stop + Save.`);
 }
@@ -326,7 +338,9 @@ async function stopAndSave() {
   if (!state.recording) return;
   const endedAt = new Date().toISOString();
   const durationSeconds = (performance.now() - state.trialStartPerf) / 1000;
+  const savedPromptIndex = state.promptIndex;
   state.recording = false;
+  state.savingTrial = true;
 
   if (state.processorNode) state.processorNode.disconnect();
   if (state.sourceNode) state.sourceNode.disconnect();
@@ -341,14 +355,20 @@ async function stopAndSave() {
   state.processorNode = null;
   state.muteNode = null;
 
-  el.startTrial.disabled = false;
+  el.startTrial.disabled = true;
   el.stopTrial.disabled = true;
-  el.prevPrompt.disabled = false;
-  el.nextPrompt.disabled = false;
+  el.prevPrompt.disabled = true;
+  el.nextPrompt.disabled = true;
   setAudioInputControlsEnabled(true);
   setRecordingIndicator("Idle", false);
+  updateDeleteLastTrialButton();
 
   if (!state.audioChunks.length) {
+    state.savingTrial = false;
+    el.startTrial.disabled = false;
+    el.prevPrompt.disabled = false;
+    el.nextPrompt.disabled = false;
+    updateDeleteLastTrialButton();
     setStatus("No audio was captured. Try again and check microphone permission.");
     return;
   }
@@ -379,19 +399,103 @@ async function stopAndSave() {
   };
 
   setStatus("Saving trial...");
-  const response = await fetch("/api/save-trial", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const result = await response.json();
+  let response;
+  let result;
+  try {
+    response = await fetch("/api/save-trial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    result = await response.json();
+  } catch (error) {
+    state.savingTrial = false;
+    el.startTrial.disabled = false;
+    el.prevPrompt.disabled = false;
+    el.nextPrompt.disabled = false;
+    updateDeleteLastTrialButton();
+    setStatus(`Save failed: ${error.message}`);
+    return;
+  }
   if (!response.ok || !result.ok) {
+    state.savingTrial = false;
+    el.startTrial.disabled = false;
+    el.prevPrompt.disabled = false;
+    el.nextPrompt.disabled = false;
+    updateDeleteLastTrialButton();
     setStatus(`Save failed: ${result.error || response.statusText}`);
     return;
   }
-  setStatus(`Saved ${result.trial_id}\n${result.session_dir}\nEvents: ${state.events.length}\nAudio frames: ${samples.length}`);
+  state.lastSavedTrial = {
+    trial_id: result.trial_id,
+    session_id: result.session_id,
+    session_dir: result.session_dir,
+    prompt_set: payload.prompt_set,
+    prompt_index: savedPromptIndex,
+  };
+  state.savingTrial = false;
+  el.startTrial.disabled = false;
+  el.typingBox.value = "";
   state.promptIndex += 1;
   refreshPrompt();
+  el.prevPrompt.disabled = false;
+  el.nextPrompt.disabled = false;
+  updateDeleteLastTrialButton();
+  setStatus(`Saved ${result.trial_id}\n${result.session_dir}\nEvents: ${state.events.length}\nAudio frames: ${samples.length}`);
+}
+
+async function deleteLastSavedTrial() {
+  const trial = state.lastSavedTrial;
+  if (!trial || state.recording || state.savingTrial || state.deletingTrial) return;
+
+  const confirmed = window.confirm(
+    `Delete ${trial.trial_id}?\n\nThis removes the raw WAV, events CSV, and metadata JSON files for that trial.`
+  );
+  if (!confirmed) return;
+
+  state.deletingTrial = true;
+  updateDeleteLastTrialButton();
+  setStatus(`Deleting ${trial.trial_id}...`);
+
+  let response;
+  let result;
+  try {
+    response = await fetch("/api/delete-trial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: trial.session_id,
+        trial_id: trial.trial_id,
+      }),
+    });
+    result = await response.json();
+  } catch (error) {
+    state.deletingTrial = false;
+    updateDeleteLastTrialButton();
+    setStatus(`Delete failed: ${error.message}`);
+    return;
+  }
+
+  if (!response.ok || !result.ok) {
+    state.deletingTrial = false;
+    updateDeleteLastTrialButton();
+    setStatus(`Delete failed: ${result.error || response.statusText}`);
+    return;
+  }
+
+  state.lastSavedTrial = null;
+  state.deletingTrial = false;
+  el.typingBox.value = "";
+  if (Number.isInteger(trial.prompt_index)) {
+    if (trial.prompt_set && state.promptSets[trial.prompt_set]) {
+      state.promptSet = trial.prompt_set;
+      el.promptSet.value = trial.prompt_set;
+    }
+    state.promptIndex = trial.prompt_index;
+    refreshPrompt();
+  }
+  updateDeleteLastTrialButton();
+  setStatus(`Deleted ${result.trial_id}\nRemoved files: ${result.deleted_paths.length}\nPrompt reset so you can retry.`);
 }
 
 function mergeAudioChunks(chunks) {
@@ -464,6 +568,7 @@ el.nextPrompt.addEventListener("click", () => {
 el.clearText.addEventListener("click", () => {
   if (!state.recording) el.typingBox.value = "";
 });
+el.deleteLastTrial.addEventListener("click", deleteLastSavedTrial);
 el.audioInput.addEventListener("change", () => {
   state.selectedAudioDeviceId = el.audioInput.value;
   updateAudioInputSummary();
@@ -486,6 +591,7 @@ if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
 async function startup() {
   await loadConfig();
   await refreshAudioInputs();
+  updateDeleteLastTrialButton();
 }
 
 startup().catch((error) => setStatus(`Startup failed: ${error.message}`));

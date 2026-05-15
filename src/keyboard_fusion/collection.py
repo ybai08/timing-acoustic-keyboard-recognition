@@ -12,6 +12,7 @@ from keyboard_fusion.paths import PROJECT_ROOT, RAW_DATA_DIR
 
 
 TRIAL_ID_PATTERN = re.compile(r"trial_(\d{3})_metadata\.json$")
+TRIAL_ID_VALUE_PATTERN = re.compile(r"^trial_\d{3}$")
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,46 @@ def build_trial_paths(
         events_path=session_dir / f"{trial_id}_events.csv",
         metadata_path=session_dir / f"{trial_id}_metadata.json",
     )
+
+
+def validate_trial_id(trial_id: str) -> str:
+    """Validate a trial ID before it is used to choose files on disk."""
+    cleaned = trial_id.strip()
+    if not TRIAL_ID_VALUE_PATTERN.match(cleaned):
+        raise ValueError(f"Invalid trial ID: {trial_id}")
+    return cleaned
+
+
+def delete_trial_files(
+    session_id: str,
+    trial_id: str,
+    raw_root: Path | None = None,
+) -> dict[str, Any]:
+    """Delete the raw audio, event log, and metadata files for one trial."""
+    safe_session_id = sanitize_id(session_id)
+    safe_trial_id = validate_trial_id(trial_id)
+    paths = build_trial_paths(safe_session_id, safe_trial_id, raw_root=raw_root)
+    trial_files = [paths.audio_path, paths.events_path, paths.metadata_path]
+
+    deleted_paths: list[str] = []
+    missing_paths: list[str] = []
+    for path in trial_files:
+        if path.exists():
+            path.unlink()
+            deleted_paths.append(str(path))
+        else:
+            missing_paths.append(str(path))
+
+    if not deleted_paths:
+        raise FileNotFoundError(f"No files found for {safe_session_id}/{safe_trial_id}")
+
+    return {
+        "session_id": safe_session_id,
+        "trial_id": safe_trial_id,
+        "session_dir": str(paths.session_dir),
+        "deleted_paths": deleted_paths,
+        "missing_paths": missing_paths,
+    }
 
 
 def load_prompt_files(prompt_dir: Path | None = None) -> dict[str, list[str]]:

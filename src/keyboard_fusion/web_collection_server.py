@@ -13,6 +13,7 @@ from typing import Any
 
 from keyboard_fusion.collection import (
     build_trial_paths,
+    delete_trial_files,
     load_prompt_files,
     make_session_id,
     next_trial_id,
@@ -87,18 +88,21 @@ class CollectorRequestHandler(BaseHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND, "Not found")
 
     def do_POST(self) -> None:
-        if self.path != "/api/save-trial":
+        if self.path not in {"/api/save-trial", "/api/delete-trial"}:
             self.send_error(HTTPStatus.NOT_FOUND, "Not found")
             return
 
         try:
             payload = self._read_json()
-            saved = self._save_trial(payload)
+            if self.path == "/api/save-trial":
+                result = self._save_trial(payload)
+            else:
+                result = self._delete_trial(payload)
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
             return
 
-        self._send_json({"ok": True, **saved})
+        self._send_json({"ok": True, **result})
 
     def _read_json(self) -> dict[str, Any]:
         content_length = int(self.headers.get("Content-Length", "0"))
@@ -163,6 +167,11 @@ class CollectorRequestHandler(BaseHTTPRequestHandler):
             "events_path": str(paths.events_path),
             "metadata_path": str(paths.metadata_path),
         }
+
+    def _delete_trial(self, payload: dict[str, Any]) -> dict[str, Any]:
+        session_id = sanitize_id(str(payload.get("session_id") or ""))
+        trial_id = str(payload.get("trial_id") or "")
+        return delete_trial_files(session_id=session_id, trial_id=trial_id)
 
     def _send_file(self, path: Path, content_type: str) -> None:
         if not path.exists():
