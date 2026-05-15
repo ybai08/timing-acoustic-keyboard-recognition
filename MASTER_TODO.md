@@ -108,12 +108,12 @@ Done when: every extracted keystroke clip can become a model-ready spectrogram.
 
 ### 10. Train The First Acoustic Baseline
 
-- [ ] Create `src/keyboard_fusion/acoustic_model.py`.
-- [ ] Start with a small CNN or simple classical baseline before using larger models.
-- [ ] Train on isolated-key spectrograms.
-- [ ] Output probability scores for every possible key.
-- [ ] Save model outputs for each test clip.
-- [ ] Report top-1 and top-5 key accuracy.
+- [x] Create `src/keyboard_fusion/acoustic_model.py`.
+- [x] Start with a small CNN or simple classical baseline before using larger models.
+- [x] Train on isolated-key spectrograms.
+- [x] Output probability scores for every possible key.
+- [x] Save model outputs for each test clip.
+- [x] Report top-1 and top-5 key accuracy.
 
 Done when: the project has an acoustic-only baseline with saved per-key probabilities.
 

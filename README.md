@@ -8,7 +8,7 @@ The initial research question is:
 
 ## Project Status
 
-Current stage: project scaffold and planning.
+Current stage: data collection, spectrogram generation, and first acoustic-only baseline.
 
 The repo includes:
 
@@ -200,6 +200,29 @@ spectrogram_preview.html
 ```
 
 Each `.npz` file contains `spectrogram`, the normalized model input, and `log_mel`, the unnormalized log-mel values. Open the preview HTML to choose a trial and inspect every generated waveform and spectrogram pair for that trial; the yellow vertical line marks the logged keydown position inside each clip.
+
+## Training The First Acoustic Baseline
+
+After generating spectrograms, run:
+
+```bash
+source .venv/bin/activate
+python scripts/train_acoustic_baseline.py
+```
+
+This trains the first acoustic-only baseline: logistic regression on flattened normalized log-mel spectrograms. It is intentionally simple so you can measure the pipeline before adding a neural network.
+
+Model outputs are written under `models/acoustic_baseline/<session_id>/`:
+
+```text
+model.joblib
+metrics.json
+test_predictions.csv
+test_probabilities.csv
+report.txt
+```
+
+The predictions file contains top-1 and top-5 guesses for each held-out clip. The probabilities file contains one probability per candidate key for each held-out clip.
 
 ## Collector Architecture
 

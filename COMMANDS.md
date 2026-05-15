@@ -149,6 +149,7 @@ Use this after you add new raw trials:
 python scripts/align_trials.py --session session_20260514_185847
 python scripts/extract_clips.py --session session_20260514_185847
 python scripts/generate_spectrograms.py --session session_20260514_185847 --preview-count 0
+python scripts/train_acoustic_baseline.py --session session_20260514_185847
 open "data/processed/spectrograms/session_20260514_185847/spectrogram_preview.html"
 ```
 
@@ -156,13 +157,38 @@ Replace `session_20260514_185847` with your actual session folder name.
 
 ## Training
 
-Training is the next project milestone and does not have a command yet. The current pipeline gets data into the right shape for training:
+Train the first acoustic-only baseline on the latest spectrogram session:
 
-```text
-raw audio + key logs
--> aligned key events
--> single-key WAV clips
--> normalized log-mel spectrogram arrays
+```bash
+python scripts/train_acoustic_baseline.py
 ```
 
-The next command we should add will likely train the first acoustic baseline from `data/processed/spectrograms/<session_id>/spectrogram_manifest.csv`.
+Train on a specific spectrogram session:
+
+```bash
+python scripts/train_acoustic_baseline.py --session session_20260514_185847
+```
+
+Train from a specific manifest:
+
+```bash
+python scripts/train_acoustic_baseline.py --spectrogram-manifest "data/processed/spectrograms/session_20260514_185847/spectrogram_manifest.csv"
+```
+
+Change the test split size:
+
+```bash
+python scripts/train_acoustic_baseline.py --session session_20260514_185847 --test-size 0.25
+```
+
+What it creates:
+
+```text
+models/acoustic_baseline/<session_id>/model.joblib
+models/acoustic_baseline/<session_id>/metrics.json
+models/acoustic_baseline/<session_id>/test_predictions.csv
+models/acoustic_baseline/<session_id>/test_probabilities.csv
+models/acoustic_baseline/<session_id>/report.txt
+```
+
+The first acoustic baseline is logistic regression on flattened normalized log-mel spectrograms. It is intentionally simple: the purpose is to get a real acoustic-only measuring stick before building a neural network. The `test_predictions.csv` file gives top-1 and top-5 guesses for each held-out clip. The `test_probabilities.csv` file gives one probability per candidate key for each held-out clip.
