@@ -138,6 +138,24 @@ Before recording:
 
 Raw recordings and processed data are ignored by Git.
 
+## Aligning Recorded Trials
+
+After collecting trials, run:
+
+```bash
+source .venv/bin/activate
+python scripts/align_trials.py
+```
+
+This maps every non-repeat `keydown` event to a WAV sample index and a fixed extraction window using the shared browser trial clock. The first version uses the browser's `trial_elapsed_seconds` timestamps rather than a beep marker; a marker can be added later if you need tighter audio-clock calibration.
+
+Alignment outputs are written under `data/metadata/alignment/<session_id>/`:
+
+```text
+trial_001_alignment.json
+alignment_report.txt
+```
+
 ## Collector Architecture
 
 There is one collection launcher:
