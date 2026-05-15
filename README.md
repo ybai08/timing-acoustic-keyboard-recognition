@@ -177,6 +177,28 @@ clip_extraction_report.txt
 
 The manifest is the important index for training later: it connects each clip path to the key label, trial ID, prompt, keydown time, and sample window.
 
+## Generating Spectrograms
+
+After extracting clips, run:
+
+```bash
+source .venv/bin/activate
+python scripts/generate_spectrograms.py
+```
+
+This converts every extracted clip into a normalized log-mel spectrogram array for model training.
+
+Spectrogram outputs are written under `data/processed/spectrograms/<session_id>/`:
+
+```text
+trial_001/trial_001_event_000_keyh_h_logmel.npz
+spectrogram_manifest.csv
+spectrogram_report.txt
+spectrogram_preview.html
+```
+
+Each `.npz` file contains `spectrogram`, the normalized model input, and `log_mel`, the unnormalized log-mel values. Open the preview HTML to quickly inspect a few generated spectrograms.
+
 ## Collector Architecture
 
 There is one collection launcher:

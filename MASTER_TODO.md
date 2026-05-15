@@ -96,12 +96,12 @@ Done when: known keydown timestamps can produce labeled single-key audio clips.
 
 ### 9. Build Log-Mel Spectrogram Generation
 
-- [ ] Create `src/keyboard_fusion/spectrograms.py`.
-- [ ] Convert one extracted clip into a log-mel spectrogram.
-- [ ] Normalize spectrogram values.
-- [ ] Save spectrogram arrays or images under `data/processed/`.
-- [ ] Add a script to generate spectrograms for all clips.
-- [ ] Add a quick notebook or report view to inspect a few spectrograms.
+- [x] Create `src/keyboard_fusion/spectrograms.py`.
+- [x] Convert one extracted clip into a log-mel spectrogram.
+- [x] Normalize spectrogram values.
+- [x] Save spectrogram arrays or images under `data/processed/`.
+- [x] Add a script to generate spectrograms for all clips.
+- [x] Add a quick notebook or report view to inspect a few spectrograms.
 
 Done when: every extracted keystroke clip can become a model-ready spectrogram.
 
@@ -277,4 +277,4 @@ Done when: the repository is clean, reproducible, and ready to share privately.
 
 ## Current Next Step
 
-- [ ] Start with Step 9: build log-mel spectrogram generation from extracted clips.
+- [ ] Start with Step 10: train the first acoustic-only baseline.
