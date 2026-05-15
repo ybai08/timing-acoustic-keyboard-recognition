@@ -192,3 +192,35 @@ models/acoustic_baseline/<session_id>/report.txt
 ```
 
 The first acoustic baseline is logistic regression on flattened normalized log-mel spectrograms. It is intentionally simple: the purpose is to get a real acoustic-only measuring stick before building a neural network. The `test_predictions.csv` file gives top-1 and top-5 guesses for each held-out clip. The `test_probabilities.csv` file gives one probability per candidate key for each held-out clip.
+
+## Visualize The Acoustic Model
+
+Generate a browser-based model visualization for the latest acoustic baseline:
+
+```bash
+python scripts/visualize_acoustic_model.py
+```
+
+Generate it for a specific session:
+
+```bash
+python scripts/visualize_acoustic_model.py --session session_20260514_185847
+```
+
+Open the visualization:
+
+```bash
+open "models/acoustic_baseline/session_20260514_185847/model_visualization.html"
+```
+
+The current acoustic baseline is not a neural network. Its structure is:
+
+```text
+64 x 10 log-mel spectrogram
+-> 640 flattened input features
+-> StandardScaler
+-> logistic regression
+-> one probability for each key class
+```
+
+For the current session, that means `640` input features, `0` hidden neurons, `22` output key classes, and `14,102` trainable weights/intercepts. The visualization shows this structure, a per-key learned weight heatmap, a confusion matrix, and held-out prediction probabilities.

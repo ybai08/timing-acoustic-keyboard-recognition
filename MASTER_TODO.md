@@ -114,6 +114,7 @@ Done when: every extracted keystroke clip can become a model-ready spectrogram.
 - [x] Output probability scores for every possible key.
 - [x] Save model outputs for each test clip.
 - [x] Report top-1 and top-5 key accuracy.
+- [x] Add a browser visualization for the acoustic baseline structure and learned weights.
 
 Done when: the project has an acoustic-only baseline with saved per-key probabilities.
 
