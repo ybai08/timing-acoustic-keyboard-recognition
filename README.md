@@ -197,7 +197,7 @@ spectrogram_report.txt
 spectrogram_preview.html
 ```
 
-Each `.npz` file contains `spectrogram`, the normalized model input, and `log_mel`, the unnormalized log-mel values. Open the preview HTML to quickly inspect a few generated spectrograms.
+Each `.npz` file contains `spectrogram`, the normalized model input, and `log_mel`, the unnormalized log-mel values. Open the preview HTML to inspect a few generated waveform and spectrogram pairs; the yellow vertical line marks the logged keydown position inside each clip.
 
 ## Collector Architecture
 

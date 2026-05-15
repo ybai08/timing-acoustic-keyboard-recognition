@@ -7,6 +7,7 @@ import numpy as np
 
 from keyboard_fusion.spectrograms import (
     generate_session_spectrograms,
+    keydown_position_in_clip,
     log_mel_spectrogram,
     mel_filterbank,
     normalize_spectrogram,
@@ -66,6 +67,19 @@ def test_read_wav_mono_float(tmp_path) -> None:
     assert np.allclose(loaded, samples, atol=1e-4)
 
 
+def test_keydown_position_uses_audio_time_not_browser_time() -> None:
+    position = keydown_position_in_clip(
+        {
+            "keydown_time_seconds": "3.3364",
+            "audio_time_seconds": "2.7664",
+            "window_start_seconds": "2.7464",
+            "window_end_seconds": "2.8114",
+        }
+    )
+
+    assert 0.30 < position < 0.31
+
+
 def test_generate_session_spectrograms_writes_outputs(tmp_path) -> None:
     session_dir = tmp_path / "clips" / "session_001" / "trial_001"
     session_dir.mkdir(parents=True)
@@ -87,6 +101,11 @@ def test_generate_session_spectrograms_writes_outputs(tmp_path) -> None:
                 "key",
                 "char",
                 "code",
+                "keydown_time_seconds",
+                "audio_time_seconds",
+                "window_start_seconds",
+                "window_end_seconds",
+                "window_duration_seconds",
                 "prompt_set",
                 "prompt_index",
                 "prompt_text",
@@ -103,6 +122,11 @@ def test_generate_session_spectrograms_writes_outputs(tmp_path) -> None:
                 "key": "a",
                 "char": "a",
                 "code": "KeyA",
+                "keydown_time_seconds": "0.5",
+                "audio_time_seconds": "0.5",
+                "window_start_seconds": "0.48",
+                "window_end_seconds": "0.545",
+                "window_duration_seconds": "0.065",
                 "prompt_set": "test",
                 "prompt_index": 0,
                 "prompt_text": "a",
@@ -126,3 +150,4 @@ def test_generate_session_spectrograms_writes_outputs(tmp_path) -> None:
     assert spectrogram_path.exists()
     loaded = np.load(spectrogram_path)
     assert loaded["spectrogram"].shape[0] == 8
+    assert 0.30 < float(records[0]["keydown_position_in_clip"]) < 0.31

@@ -29,6 +29,12 @@ SPECTROGRAM_MANIFEST_COLUMNS = [
     "frames",
     "mean",
     "std",
+    "keydown_time_seconds",
+    "audio_time_seconds",
+    "audio_start_offset_seconds",
+    "window_start_seconds",
+    "window_end_seconds",
+    "keydown_position_in_clip",
     "prompt_set",
     "prompt_index",
     "prompt_text",
@@ -153,6 +159,32 @@ def normalize_spectrogram(spectrogram: np.ndarray) -> tuple[np.ndarray, float, f
     return normalized, mean, std
 
 
+def parse_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def keydown_position_in_clip(record: dict[str, Any]) -> float:
+    """Return the keydown position inside the clip as a 0..1 fraction."""
+    keydown_time = parse_float(record.get("audio_time_seconds"))
+    if keydown_time == 0.0 and not record.get("audio_time_seconds"):
+        sample_index = parse_float(record.get("sample_index"), -1.0)
+        window_start_sample = parse_float(record.get("window_start_sample"), -1.0)
+        window_end_sample = parse_float(record.get("window_end_sample"), -1.0)
+        sample_duration = window_end_sample - window_start_sample
+        if sample_index >= 0 and sample_duration > 0:
+            return max(0.0, min(1.0, (sample_index - window_start_sample) / sample_duration))
+        keydown_time = parse_float(record.get("keydown_time_seconds"))
+    window_start = parse_float(record.get("window_start_seconds"))
+    window_end = parse_float(record.get("window_end_seconds"))
+    duration = window_end - window_start
+    if duration <= 0:
+        return 0.0
+    return max(0.0, min(1.0, (keydown_time - window_start) / duration))
+
+
 def load_clip_manifest(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as file:
         return list(csv.DictReader(file))
@@ -219,11 +251,66 @@ def generate_spectrogram_for_clip(
         "frames": normalized.shape[1],
         "mean": round(mean, 9),
         "std": round(std, 9),
+        "keydown_position_in_clip": round(keydown_position_in_clip(record), 9),
     }
     return spectrogram_record, normalized
 
 
-def spectrogram_to_svg(spectrogram: np.ndarray, width: int = 260, height: int = 130) -> str:
+def marker_line_svg(marker_fraction: float, width: int, height: int) -> str:
+    x = max(0.0, min(1.0, marker_fraction)) * width
+    return (
+        f'<line x1="{x:.2f}" y1="0" x2="{x:.2f}" y2="{height}" '
+        'stroke="#ffcc66" stroke-width="2" vector-effect="non-scaling-stroke" />'
+    )
+
+
+def waveform_to_svg(
+    samples: np.ndarray,
+    marker_fraction: float,
+    width: int = 260,
+    height: int = 72,
+) -> str:
+    """Render a compact waveform with a vertical keydown marker."""
+    values = samples.astype(np.float32)
+    if values.size == 0:
+        values = np.zeros(1, dtype=np.float32)
+
+    peak = float(np.max(np.abs(values))) or 1.0
+    center_y = height / 2
+    usable_height = height * 0.42
+    columns = min(width, max(1, int(values.size)))
+    lines: list[str] = [
+        f'<line x1="0" y1="{center_y:.2f}" x2="{width}" y2="{center_y:.2f}" '
+        'stroke="rgba(154,168,188,0.35)" stroke-width="1" />'
+    ]
+
+    for column in range(columns):
+        start = int(column * values.size / columns)
+        end = int((column + 1) * values.size / columns)
+        chunk = values[start:max(end, start + 1)]
+        minimum = float(np.min(chunk))
+        maximum = float(np.max(chunk))
+        x = column * width / columns
+        y1 = center_y - (maximum / peak * usable_height)
+        y2 = center_y - (minimum / peak * usable_height)
+        lines.append(
+            f'<line x1="{x:.2f}" y1="{y1:.2f}" x2="{x:.2f}" y2="{y2:.2f}" '
+            'stroke="#49a5ff" stroke-width="1" />'
+        )
+
+    lines.append(marker_line_svg(marker_fraction, width, height))
+    return (
+        f'<svg viewBox="0 0 {width} {height}" width="{width}" height="{height}" '
+        f'role="img" aria-label="waveform with keydown marker">{"".join(lines)}</svg>'
+    )
+
+
+def spectrogram_to_svg(
+    spectrogram: np.ndarray,
+    marker_fraction: float,
+    width: int = 260,
+    height: int = 130,
+) -> str:
     """Render a compact inline SVG heatmap for quick visual inspection."""
     values = spectrogram.astype(np.float32)
     minimum = float(np.min(values))
@@ -249,23 +336,32 @@ def spectrogram_to_svg(spectrogram: np.ndarray, width: int = 260, height: int = 
                 f'fill="{color}" />'
             )
 
+    rects.append(marker_line_svg(marker_fraction, width, height))
     return (
         f'<svg viewBox="0 0 {width} {height}" width="{width}" height="{height}" '
         f'role="img" aria-label="log mel spectrogram">{"".join(rects)}</svg>'
     )
 
 
-def build_preview_html(previews: list[tuple[dict[str, Any], np.ndarray]]) -> str:
+def build_preview_html(previews: list[tuple[dict[str, Any], np.ndarray, np.ndarray]]) -> str:
     cards: list[str] = []
-    for record, spectrogram in previews:
+    for record, spectrogram, samples in previews:
         key = "Space" if record.get("key") == " " else str(record.get("key", ""))
         title = html.escape(f"{record['clip_id']} | key={key}")
-        subtitle = html.escape(f"{record['trial_id']} | frames={record['frames']} | shape={spectrogram.shape}")
+        marker_fraction = parse_float(record.get("keydown_position_in_clip"))
+        keydown_ms = marker_fraction * parse_float(record.get("window_duration_seconds"), 0.065) * 1000
+        subtitle = html.escape(
+            f"{record['trial_id']} | keydown at {keydown_ms:.1f} ms | "
+            f"spectrogram={spectrogram.shape}"
+        )
         cards.append(
             "<section>"
             f"<h2>{title}</h2>"
             f"<p>{subtitle}</p>"
-            f"{spectrogram_to_svg(spectrogram)}"
+            '<div class="label-row"><span>Waveform</span><span>yellow line = logged keydown</span></div>'
+            f"{waveform_to_svg(samples, marker_fraction)}"
+            '<div class="label-row"><span>Log-mel spectrogram</span><span>same keydown marker</span></div>'
+            f"{spectrogram_to_svg(spectrogram, marker_fraction)}"
             "</section>"
         )
 
@@ -296,7 +392,21 @@ def build_preview_html(previews: list[tuple[dict[str, Any], np.ndarray]]) -> str
     }}
     h2 {{ font-size: 13px; margin: 0 0 4px; overflow-wrap: anywhere; }}
     p {{ color: #9aa8bc; font-size: 12px; margin: 0 0 10px; }}
-    svg {{ display: block; width: 100%; height: auto; background: #05070b; }}
+    .label-row {{
+      color: #9aa8bc;
+      display: flex;
+      font-size: 11px;
+      justify-content: space-between;
+      margin: 10px 0 5px;
+      gap: 10px;
+    }}
+    svg {{
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #05070b;
+      border: 1px solid rgba(154,168,188,0.18);
+    }}
   </style>
 </head>
 <body>
@@ -354,7 +464,7 @@ def generate_session_spectrograms(
     output_base = output_root or PROCESSED_DATA_DIR / "spectrograms"
     output_dir = output_base / session_id
     records: list[dict[str, Any]] = []
-    previews: list[tuple[dict[str, Any], np.ndarray]] = []
+    previews: list[tuple[dict[str, Any], np.ndarray, np.ndarray]] = []
 
     for clip_record in clip_records:
         spectrogram_record, spectrogram = generate_spectrogram_for_clip(
@@ -366,7 +476,8 @@ def generate_session_spectrograms(
         )
         records.append(spectrogram_record)
         if len(previews) < preview_count:
-            previews.append((spectrogram_record, spectrogram))
+            _, samples = read_wav_mono_float(Path(spectrogram_record["clip_audio_path"]))
+            previews.append((spectrogram_record, spectrogram, samples))
 
     manifest_path = output_dir / "spectrogram_manifest.csv"
     report_path = output_dir / "spectrogram_report.txt"
