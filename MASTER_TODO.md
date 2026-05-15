@@ -89,6 +89,7 @@ Done when: the project can reliably locate where each keypress should appear in 
 - [x] Create `src/keyboard_fusion/preprocessing.py`.
 - [x] Load one trial's audio and metadata.
 - [x] For each keydown timestamp, cut a fixed window around the keypress.
+- [x] Mask neighboring overlap regions when two keypresses happen very close together.
 - [x] Save extracted clips under `data/processed/`.
 - [x] Save clip metadata with key label, trial ID, start time, and end time.
 - [x] Add tests for clip window calculations.

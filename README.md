@@ -153,6 +153,8 @@ python scripts/align_trials.py
 
 This maps every non-repeat `keydown` event to a WAV sample index and a fixed extraction window. The browser key log and WAV stream can start a little out of sync, so the alignment step estimates a per-trial audio offset from waveform energy before creating sample windows. A beep marker can still be added later if you need tighter audio-clock calibration.
 
+When two logged keypresses are extremely close together, their full fixed windows can overlap. The alignment metadata therefore also stores a neighbor-aware `isolation_*` region for each key. That region is split at the midpoint between neighboring keydowns so the extractor can keep one key's main sound while avoiding duplicate neighboring clicks in both clips.
+
 Alignment outputs are written under `data/metadata/alignment/<session_id>/`:
 
 ```text
@@ -171,6 +173,8 @@ python scripts/extract_clips.py
 
 This cuts one labeled `.wav` clip for every aligned non-repeat `keydown` event. For the current oracle baseline, each clip uses the configured extraction window around the offset-corrected true keydown timestamp. The default window is intentionally short, `20 ms` before keydown through `45 ms` after keydown, to reduce neighboring keys leaking into the same clip.
 
+The clip duration stays fixed for model consistency. If two keydowns are very close, the extractor keeps the fixed clip length but silences audio outside that key's neighbor-aware isolation region. This gives the model same-shaped examples while reducing cases where two adjacent clips contain the same pair of clicks.
+
 Clip outputs are written under `data/processed/clips/<session_id>/`:
 
 ```text
@@ -179,7 +183,7 @@ clip_manifest.csv
 clip_extraction_report.txt
 ```
 
-The manifest is the important index for training later: it connects each clip path to the key label, trial ID, prompt, keydown time, and sample window.
+The manifest is the important index for training later: it connects each clip path to the key label, trial ID, prompt, keydown time, sample window, and any neighbor-aware isolation/masking that was applied.
 
 ## Generating Spectrograms
 

@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from keyboard_fusion.alignment import align_keydown_event, estimate_audio_start_offset, keydown_events
+from keyboard_fusion.alignment import (
+    add_neighbor_aware_isolation,
+    align_keydown_event,
+    estimate_audio_start_offset,
+    keydown_events,
+)
 
 
 def test_align_keydown_event_maps_time_to_sample_window() -> None:
@@ -50,6 +55,39 @@ def test_align_keydown_event_subtracts_audio_start_offset() -> None:
     assert alignment["sample_index"] == 750
     assert alignment["window_start_sample"] == 730
     assert alignment["window_end_sample"] == 830
+
+
+def test_neighbor_aware_isolation_marks_non_overlapping_keep_regions() -> None:
+    first = align_keydown_event(
+        {"event_index": "0", "event_type": "keydown", "key": "a", "code": "KeyA", "trial_elapsed_seconds": "1.000"},
+        sample_rate=1000,
+        frame_count=5000,
+        pre_keydown_ms=20,
+        post_keydown_ms=45,
+    )
+    second = align_keydown_event(
+        {"event_index": "1", "event_type": "keydown", "key": "b", "code": "KeyB", "trial_elapsed_seconds": "1.030"},
+        sample_rate=1000,
+        frame_count=5000,
+        pre_keydown_ms=20,
+        post_keydown_ms=45,
+    )
+
+    adjusted = add_neighbor_aware_isolation([first, second], sample_rate=1000)
+
+    assert adjusted[0]["window_start_sample"] == 980
+    assert adjusted[0]["window_end_sample"] == 1045
+    assert adjusted[0]["isolation_start_sample"] == 980
+    assert adjusted[0]["isolation_end_sample"] == 1015
+    assert adjusted[0]["overlap_adjusted_right"] is True
+    assert adjusted[0]["next_key_gap_seconds"] == 0.03
+
+    assert adjusted[1]["window_start_sample"] == 1010
+    assert adjusted[1]["window_end_sample"] == 1075
+    assert adjusted[1]["isolation_start_sample"] == 1015
+    assert adjusted[1]["isolation_end_sample"] == 1075
+    assert adjusted[1]["overlap_adjusted_left"] is True
+    assert adjusted[1]["previous_key_gap_seconds"] == 0.03
 
 
 def test_estimate_audio_start_offset_finds_synthetic_impulse_shift() -> None:

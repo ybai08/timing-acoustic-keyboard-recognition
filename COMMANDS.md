@@ -69,6 +69,8 @@ Change the key clip window used during alignment:
 python scripts/align_trials.py --pre-ms 20 --post-ms 45
 ```
 
+Close keypresses can make the full fixed windows overlap. Alignment records both the fixed window and a smaller neighbor-aware keep region, split at the midpoint between adjacent keydowns. The extraction command keeps clip length fixed, but silences audio outside that keep region so very fast keypairs are not duplicated across both clips.
+
 What it creates:
 
 ```text
@@ -97,6 +99,8 @@ data/processed/clips/<session_id>/trial_001/trial_001_event_000_keyh_h.wav
 data/processed/clips/<session_id>/clip_manifest.csv
 data/processed/clips/<session_id>/clip_extraction_report.txt
 ```
+
+The manifest includes the fixed clip window plus `isolation_*` columns. If `overlap_adjusted_left` or `overlap_adjusted_right` is `True`, that side of the clip was silenced because a neighboring keypress was very close.
 
 ## Generate Spectrograms And Preview
 

@@ -26,9 +26,18 @@ MANIFEST_COLUMNS = [
     "window_start_seconds",
     "window_end_seconds",
     "window_duration_seconds",
+    "isolation_start_seconds",
+    "isolation_end_seconds",
+    "isolation_duration_seconds",
     "sample_index",
     "window_start_sample",
     "window_end_sample",
+    "isolation_start_sample",
+    "isolation_end_sample",
+    "overlap_adjusted_left",
+    "overlap_adjusted_right",
+    "previous_key_gap_seconds",
+    "next_key_gap_seconds",
     "sample_rate",
     "channels",
     "prompt_set",
@@ -57,25 +66,46 @@ def clip_id_for_keydown(trial_id: str, keydown: dict[str, Any]) -> str:
     return f"{trial_id}_event_{event_index:03d}_{code_label}_{key_label}"
 
 
-def write_wav_clip(source_audio_path: Path, output_path: Path, start_sample: int, end_sample: int) -> int:
-    """Copy a sample window from a source WAV into a new WAV clip."""
+def write_wav_clip(
+    source_audio_path: Path,
+    output_path: Path,
+    start_sample: int,
+    end_sample: int,
+    keep_start_sample: int | None = None,
+    keep_end_sample: int | None = None,
+) -> int:
+    """Copy a WAV window, optionally silencing samples outside a keep region."""
     if end_sample < start_sample:
         raise ValueError("end_sample must be greater than or equal to start_sample")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(source_audio_path), "rb") as source:
         frame_count = source.getnframes()
+        bytes_per_frame = source.getnchannels() * source.getsampwidth()
         bounded_start = max(0, min(start_sample, frame_count))
         bounded_end = max(bounded_start, min(end_sample, frame_count))
         frames_to_read = bounded_end - bounded_start
         source.setpos(bounded_start)
-        frames = source.readframes(frames_to_read)
+        frames = bytearray(source.readframes(frames_to_read))
+
+        keep_start = bounded_start if keep_start_sample is None else keep_start_sample
+        keep_end = bounded_end if keep_end_sample is None else keep_end_sample
+        keep_start = max(bounded_start, min(int(keep_start), bounded_end))
+        keep_end = max(keep_start, min(int(keep_end), bounded_end))
+
+        if keep_start > bounded_start or keep_end < bounded_end:
+            silence = b"\x00" * bytes_per_frame
+            for frame_offset in range(frames_to_read):
+                absolute_frame = bounded_start + frame_offset
+                if absolute_frame < keep_start or absolute_frame >= keep_end:
+                    byte_start = frame_offset * bytes_per_frame
+                    frames[byte_start : byte_start + bytes_per_frame] = silence
 
         with wave.open(str(output_path), "wb") as target:
             target.setnchannels(source.getnchannels())
             target.setsampwidth(source.getsampwidth())
             target.setframerate(source.getframerate())
-            target.writeframes(frames)
+            target.writeframes(bytes(frames))
 
     return frames_to_read
 
@@ -108,9 +138,18 @@ def build_clip_record(
         "window_start_seconds": keydown["window_start_seconds"],
         "window_end_seconds": keydown["window_end_seconds"],
         "window_duration_seconds": round(frame_count / alignment["audio"]["sample_rate"], 9),
+        "isolation_start_seconds": keydown.get("isolation_start_seconds", keydown["window_start_seconds"]),
+        "isolation_end_seconds": keydown.get("isolation_end_seconds", keydown["window_end_seconds"]),
+        "isolation_duration_seconds": keydown.get("isolation_duration_seconds", keydown["window_duration_seconds"]),
         "sample_index": keydown.get("sample_index", ""),
         "window_start_sample": keydown["window_start_sample"],
         "window_end_sample": keydown["window_end_sample"],
+        "isolation_start_sample": keydown.get("isolation_start_sample", keydown["window_start_sample"]),
+        "isolation_end_sample": keydown.get("isolation_end_sample", keydown["window_end_sample"]),
+        "overlap_adjusted_left": keydown.get("overlap_adjusted_left", False),
+        "overlap_adjusted_right": keydown.get("overlap_adjusted_right", False),
+        "previous_key_gap_seconds": keydown.get("previous_key_gap_seconds", ""),
+        "next_key_gap_seconds": keydown.get("next_key_gap_seconds", ""),
         "sample_rate": alignment["audio"]["sample_rate"],
         "channels": alignment["audio"]["channels"],
         "prompt_set": alignment["prompt_set"],
@@ -144,6 +183,8 @@ def extract_trial_clips(
             output_path=clip_audio_path,
             start_sample=int(keydown["window_start_sample"]),
             end_sample=int(keydown["window_end_sample"]),
+            keep_start_sample=int(keydown.get("isolation_start_sample", keydown["window_start_sample"])),
+            keep_end_sample=int(keydown.get("isolation_end_sample", keydown["window_end_sample"])),
         )
         records.append(
             build_clip_record(

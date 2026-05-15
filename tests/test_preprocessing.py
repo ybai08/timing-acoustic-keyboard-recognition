@@ -44,6 +44,33 @@ def test_write_wav_clip_cuts_expected_frame_count(tmp_path) -> None:
         assert clip_file.getnframes() == 250
 
 
+def test_write_wav_clip_silences_outside_keep_region(tmp_path) -> None:
+    source_path = tmp_path / "source.wav"
+    clip_path = tmp_path / "clip.wav"
+    write_test_wav(source_path, frame_count=100)
+
+    frames_written = write_wav_clip(
+        source_path,
+        clip_path,
+        start_sample=10,
+        end_sample=30,
+        keep_start_sample=15,
+        keep_end_sample=25,
+    )
+
+    assert frames_written == 20
+    with wave.open(str(clip_path), "rb") as clip_file:
+        raw_frames = clip_file.readframes(clip_file.getnframes())
+
+    samples = [
+        int.from_bytes(raw_frames[index : index + 2], byteorder="little", signed=True)
+        for index in range(0, len(raw_frames), 2)
+    ]
+    assert samples[:5] == [0, 0, 0, 0, 0]
+    assert samples[5:15] == list(range(15, 25))
+    assert samples[15:] == [0, 0, 0, 0, 0]
+
+
 def test_write_wav_clip_clips_to_audio_bounds(tmp_path) -> None:
     source_path = tmp_path / "source.wav"
     clip_path = tmp_path / "clip.wav"

@@ -262,6 +262,68 @@ def align_keydown_event(
     }
 
 
+def add_neighbor_aware_isolation(
+    keydown_alignments: list[dict[str, Any]],
+    sample_rate: int,
+) -> list[dict[str, Any]]:
+    """Mark the non-overlapping part of each fixed clip window.
+
+    The clip window stays fixed length for model training, but extraction can
+    silence samples outside the isolation region when neighboring keydowns are
+    very close together.
+    """
+    adjusted: list[dict[str, Any]] = []
+    for index, item in enumerate(keydown_alignments):
+        current = dict(item)
+        sample_index = int(current["sample_index"])
+        isolation_start = int(current["window_start_sample"])
+        isolation_end = int(current["window_end_sample"])
+
+        previous_item = keydown_alignments[index - 1] if index > 0 else None
+        next_item = keydown_alignments[index + 1] if index + 1 < len(keydown_alignments) else None
+
+        previous_gap_seconds = None
+        next_gap_seconds = None
+        overlap_adjusted_left = False
+        overlap_adjusted_right = False
+
+        if previous_item is not None:
+            previous_sample = int(previous_item["sample_index"])
+            previous_gap_seconds = round((sample_index - previous_sample) / sample_rate, 9)
+            left_boundary = int(round((previous_sample + sample_index) / 2))
+            if left_boundary > isolation_start:
+                isolation_start = min(max(left_boundary, isolation_start), sample_index)
+                overlap_adjusted_left = True
+
+        if next_item is not None:
+            next_sample = int(next_item["sample_index"])
+            next_gap_seconds = round((next_sample - sample_index) / sample_rate, 9)
+            right_boundary = int(round((sample_index + next_sample) / 2))
+            if right_boundary < isolation_end:
+                isolation_end = max(min(right_boundary, isolation_end), sample_index + 1)
+                overlap_adjusted_right = True
+
+        if isolation_end < isolation_start:
+            isolation_end = isolation_start
+
+        current.update(
+            {
+                "isolation_start_sample": isolation_start,
+                "isolation_end_sample": isolation_end,
+                "isolation_start_seconds": round(isolation_start / sample_rate, 9),
+                "isolation_end_seconds": round(isolation_end / sample_rate, 9),
+                "isolation_duration_seconds": round((isolation_end - isolation_start) / sample_rate, 9),
+                "overlap_adjusted_left": overlap_adjusted_left,
+                "overlap_adjusted_right": overlap_adjusted_right,
+                "previous_key_gap_seconds": previous_gap_seconds,
+                "next_key_gap_seconds": next_gap_seconds,
+            }
+        )
+        adjusted.append(current)
+
+    return adjusted
+
+
 def align_trial(
     metadata_path: Path,
     pre_keydown_ms: float,
@@ -296,12 +358,23 @@ def align_trial(
         )
         for event in keydowns
     ]
+    keydown_alignments = add_neighbor_aware_isolation(keydown_alignments, wav_info.sample_rate)
     outside_audio_count = sum(1 for item in keydown_alignments if not item["within_audio"])
     clipped_count = sum(1 for item in keydown_alignments if item["clipped_left"] or item["clipped_right"])
-    next_key_overlap_count = sum(
+    fixed_window_next_key_overlap_count = sum(
         1
         for current, following in zip(keydown_alignments, keydown_alignments[1:])
         if following["audio_time_seconds"] < current["window_end_seconds"]
+    )
+    next_key_overlap_count = sum(
+        1
+        for current, following in zip(keydown_alignments, keydown_alignments[1:])
+        if int(following["sample_index"]) < int(current["isolation_end_sample"])
+    )
+    neighbor_adjusted_count = sum(
+        1
+        for item in keydown_alignments
+        if item["overlap_adjusted_left"] or item["overlap_adjusted_right"]
     )
     keydown_times = [item["keydown_time_seconds"] for item in keydown_alignments]
 
@@ -353,6 +426,7 @@ def align_trial(
             "post_keydown_ms": post_keydown_ms,
             "pre_keydown_samples": int(round(wav_info.sample_rate * pre_keydown_ms / 1000)),
             "post_keydown_samples": int(round(wav_info.sample_rate * post_keydown_ms / 1000)),
+            "isolation_mode": "fixed_window_with_neighbor_mask",
         },
         "event_counts": {
             "total_events": len(events),
@@ -361,6 +435,8 @@ def align_trial(
             "outside_audio_keydown_events": outside_audio_count,
             "clipped_window_events": clipped_count,
             "next_key_overlap_windows": next_key_overlap_count,
+            "fixed_window_next_key_overlap_windows": fixed_window_next_key_overlap_count,
+            "neighbor_adjusted_window_events": neighbor_adjusted_count,
         },
         "keydown_alignments": keydown_alignments,
     }
@@ -425,24 +501,36 @@ def build_session_report(alignments: list[dict[str, Any]]) -> str:
                     f"Keydowns: {counts['aligned_keydown_events']} aligned, "
                     f"{counts['outside_audio_keydown_events']} outside audio, "
                     f"{counts['clipped_window_events']} clipped windows, "
-                    f"{counts['next_key_overlap_windows']} overlap next key"
+                    f"{counts['next_key_overlap_windows']} overlap next key after masking"
+                ),
+                (
+                    "Neighbor masking: "
+                    f"{counts.get('neighbor_adjusted_window_events', 0)} adjusted events "
+                    f"({counts.get('fixed_window_next_key_overlap_windows', 0)} fixed-window overlaps before masking)"
                 ),
                 (
                     f"Window: {window['pre_keydown_ms']} ms before to "
                     f"{window['post_keydown_ms']} ms after keydown"
                 ),
-                "idx  key      code       trial_s  audio_s   sample    window_s",
+                "idx  key      code       trial_s  audio_s   sample    window_s        keep_s",
             ]
         )
         for item in alignment["keydown_alignments"]:
             key = item["key"] if item["key"] != " " else "Space"
             clipped = " clipped" if item["clipped_left"] or item["clipped_right"] else ""
+            adjusted = (
+                " masked"
+                if item.get("overlap_adjusted_left") or item.get("overlap_adjusted_right")
+                else ""
+            )
             lines.append(
                 f"{item['event_index']:>3}  {key:<8} {item['code']:<10} "
                 f"{item['keydown_time_seconds']:>7.3f}  {item['audio_time_seconds']:>7.3f}  "
                 f"{item['sample_index']:>8}  "
                 f"{item['window_start_seconds']:>7.3f}-{item['window_end_seconds']:<7.3f}"
-                f"{clipped}"
+                f"  {item.get('isolation_start_seconds', item['window_start_seconds']):>7.3f}-"
+                f"{item.get('isolation_end_seconds', item['window_end_seconds']):<7.3f}"
+                f"{clipped}{adjusted}"
             )
         lines.append("")
 
