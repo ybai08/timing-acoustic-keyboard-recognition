@@ -23,6 +23,7 @@ from keyboard_fusion.acoustic_model import (
     label_count_dict,
     load_spectrogram_array,
     load_spectrogram_manifest,
+    session_id_from_manifest,
     split_train_test_indices,
     write_csv,
 )
@@ -517,6 +518,7 @@ def build_text_report(metrics: dict[str, Any], y_test: np.ndarray, y_pred: np.nd
 def train_acoustic_cnn(
     spectrogram_manifest_path: Path,
     output_root: Path | None = None,
+    output_session_id: str | None = None,
     test_size: float = 0.2,
     validation_size: float = 0.2,
     random_seed: int = 42,
@@ -658,7 +660,7 @@ def train_acoustic_cnn(
         probabilities=probabilities,
     )
 
-    session_id = records[0].get("session_id", spectrogram_manifest_path.parent.name)
+    session_id = session_id_from_manifest(spectrogram_manifest_path, records, output_session_id)
     output_base = output_root or MODELS_DIR / "acoustic_cnn"
     output_dir = output_base / session_id
     output_dir.mkdir(parents=True, exist_ok=True)

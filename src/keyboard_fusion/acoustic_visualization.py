@@ -102,6 +102,7 @@ def prediction_payload(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         predictions.append(
             {
                 "clipId": row.get("clip_id", ""),
+                "sessionId": row.get("session_id", ""),
                 "trialId": row.get("trial_id", ""),
                 "eventIndex": row.get("event_index", ""),
                 "trueKey": row.get("true_key", ""),
@@ -740,7 +741,7 @@ def html_template() -> str:
         const title = document.createElement("div");
         title.className = "prediction-title";
         const strong = document.createElement("strong");
-        strong.textContent = row.clipId;
+        strong.textContent = row.sessionId ? `${row.sessionId} / ${row.clipId}` : row.clipId;
         const pill = document.createElement("span");
         pill.className = `pill ${row.correctTop1 ? "good" : "bad"}`;
         pill.textContent = `true ${row.trueKey} | predicted ${row.predictedKey}`;

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acoustic CNN Demo</title>
+  <link rel="stylesheet" href="/acoustic_demo.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <div class="eyebrow">Acoustic CNN</div>
+        <h1>Keyboard Acoustic Decoder</h1>
+      </div>
+      <div class="header-pills">
+        <span class="pill">Local</span>
+        <span class="pill">Synthetic only</span>
+        <span id="recordingPill" class="pill idle"><span class="dot"></span>Idle</span>
+      </div>
+    </header>
+
+    <section class="layout">
+      <div class="panel controls-panel">
+        <div class="field-row">
+          <label for="audioInput">Input</label>
+          <button id="refreshAudioInputs" type="button" class="small-button">Allow / Refresh</button>
+        </div>
+        <select id="audioInput">
+          <option value="">Loading inputs...</option>
+        </select>
+
+        <div class="control-grid">
+          <label>
+            <span>Sensitivity</span>
+            <input id="sensitivity" type="range" min="0.4" max="2.5" value="0.5" step="0.1">
+            <strong id="sensitivityValue">0.5</strong>
+          </label>
+          <label>
+            <span>Expected Keys</span>
+            <input id="maxEvents" type="number" min="1" max="120" value="5">
+          </label>
+        </div>
+
+        <div id="typingPad" class="typing-pad" tabindex="0">
+          <span>Recording pad</span>
+        </div>
+
+        <div class="buttons">
+          <button id="startRecording" type="button" class="primary">Start</button>
+          <button id="stopRecording" type="button" class="danger" disabled>Stop + Decode</button>
+          <button id="clearResults" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="panel result-panel">
+        <div class="result-header">
+          <label>Guess</label>
+          <span id="modelMeta" class="meta">Loading model...</span>
+        </div>
+        <div id="predictionText" class="prediction-text">-</div>
+        <div id="status" class="status">Loading...</div>
+        <div id="runMeta" class="run-meta"></div>
+      </div>
+    </section>
+
+    <section class="panel events-panel">
+      <div class="events-header">
+        <label>Detected Keys</label>
+        <span id="eventCount" class="meta">0 keys</span>
+      </div>
+      <div id="events" class="events"></div>
+    </section>
+  </main>
+
+  <script src="/acoustic_demo.js" defer></script>
+</body>
+</html>

@@ -3,7 +3,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from keyboard_fusion.acoustic_model import find_latest_spectrogram_session, train_acoustic_baseline
+from keyboard_fusion.acoustic_model import (
+    COMBINED_SESSION_ID,
+    build_combined_spectrogram_manifest,
+    find_latest_spectrogram_session,
+    train_acoustic_baseline,
+)
 from keyboard_fusion.config import load_config
 from keyboard_fusion.paths import MODELS_DIR, PROCESSED_DATA_DIR
 
@@ -40,22 +45,49 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument("--spectrogram-manifest", help="Path to a specific spectrogram_manifest.csv.")
+    parser.add_argument(
+        "--all-sessions",
+        action="store_true",
+        help="Build a combined manifest from every processed spectrogram session before training.",
+    )
+    parser.add_argument(
+        "--combined-session-id",
+        default=COMBINED_SESSION_ID,
+        help="Folder/model name used when --all-sessions is enabled.",
+    )
     parser.add_argument("--output-root", type=Path, default=MODELS_DIR / "acoustic_baseline")
     parser.add_argument("--test-size", type=float, default=float(experiment_config.get("test_size", 0.2)))
     parser.add_argument("--random-seed", type=int, default=int(experiment_config.get("random_seed", 42)))
     parser.add_argument("--max-iter", type=int, default=2000)
     args = parser.parse_args(argv)
 
-    spectrogram_manifest_path = resolve_spectrogram_manifest(args.session, args.spectrogram_manifest)
+    combined_summary: dict[str, object] | None = None
+    if args.all_sessions:
+        if args.session or args.spectrogram_manifest:
+            parser.error("--all-sessions cannot be combined with --session or --spectrogram-manifest")
+        spectrogram_manifest_path, combined_summary = build_combined_spectrogram_manifest(
+            combined_session_id=args.combined_session_id,
+        )
+    else:
+        spectrogram_manifest_path = resolve_spectrogram_manifest(args.session, args.spectrogram_manifest)
+
     outputs = train_acoustic_baseline(
         spectrogram_manifest_path=spectrogram_manifest_path,
         output_root=args.output_root,
+        output_session_id=args.combined_session_id if args.all_sessions else None,
         test_size=args.test_size,
         random_seed=args.random_seed,
         max_iter=args.max_iter,
     )
 
     metrics = outputs.metrics
+    if combined_summary:
+        print(
+            "Combined sessions: "
+            f"{combined_summary['manifest_count']} manifests, {combined_summary['total_records']} spectrograms"
+        )
+        for session_id, count in combined_summary["session_counts"].items():
+            print(f"- {session_id}: {count}")
     print(f"Spectrogram manifest: {spectrogram_manifest_path}")
     print(f"Output folder: {outputs.output_dir}")
     print(f"Train clips: {metrics['train_count']}")

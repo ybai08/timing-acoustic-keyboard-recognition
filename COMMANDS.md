@@ -153,12 +153,17 @@ Use this after you add new raw trials:
 python scripts/align_trials.py --session session_20260514_185847
 python scripts/extract_clips.py --session session_20260514_185847
 python scripts/generate_spectrograms.py --session session_20260514_185847 --preview-count 0
-python scripts/train_acoustic_baseline.py --session session_20260514_185847
-python scripts/train_acoustic_cnn.py --session session_20260514_185847
+python scripts/train_acoustic_cnn.py --all-sessions
 open "data/processed/spectrograms/session_20260514_185847/spectrogram_preview.html"
+python scripts/visualize_acoustic_model.py --session all_sessions
+open "models/acoustic_cnn/all_sessions/model_visualization.html"
+python scripts/evaluate_segmentation.py --all-sessions --predict-cnn --extract-clips
+python scripts/train_neural_segmenter.py --all-sessions
+python scripts/run_acoustic_demo.py
 ```
 
 Replace `session_20260514_185847` with your actual session folder name.
+The `--all-sessions` command retrains the main optimized CNN on every processed spectrogram session. Train a single-session baseline only when you want a comparison against one recording batch.
 
 ## Train The Logistic Acoustic Baseline
 
@@ -178,6 +183,12 @@ Train from a specific manifest:
 
 ```bash
 python scripts/train_acoustic_baseline.py --spectrogram-manifest "data/processed/spectrograms/session_20260514_185847/spectrogram_manifest.csv"
+```
+
+Train the baseline on every processed spectrogram session:
+
+```bash
+python scripts/train_acoustic_baseline.py --all-sessions
 ```
 
 Change the test split size:
@@ -218,6 +229,24 @@ Train on a specific spectrogram session:
 python scripts/train_acoustic_cnn.py --session session_20260514_185847
 ```
 
+Train the main optimized acoustic-only CNN on the entire processed dataset:
+
+```bash
+python scripts/train_acoustic_cnn.py --all-sessions
+```
+
+This first creates:
+
+```text
+data/processed/spectrograms/all_sessions/spectrogram_manifest.csv
+```
+
+Then it trains into:
+
+```text
+models/acoustic_cnn/all_sessions/
+```
+
 Useful tuning flags:
 
 ```bash
@@ -252,10 +281,16 @@ Generate it for a specific CNN session:
 python scripts/visualize_acoustic_model.py --session session_20260514_230910
 ```
 
-Open the CNN visualization:
+Generate it for the full-dataset CNN:
 
 ```bash
-open "models/acoustic_cnn/session_20260514_230910/model_visualization.html"
+python scripts/visualize_acoustic_model.py --session all_sessions
+```
+
+Open the main full-dataset CNN visualization:
+
+```bash
+open "models/acoustic_cnn/all_sessions/model_visualization.html"
 ```
 
 The unified viewer detects the model type. For the optimized CNN, it shows architecture, training history, a confusion matrix, and held-out prediction probabilities.
@@ -278,3 +313,131 @@ The logistic baseline structure is:
 ```
 
 For the logistic baseline, the viewer also shows per-key learned weight heatmaps.
+
+## Evaluate Automatic Segmentation
+
+Evaluate whether raw-audio peak detection finds the same keypresses as the digital key log:
+
+```bash
+python scripts/evaluate_segmentation.py --all-sessions
+```
+
+Tune detector parameters against every aligned session:
+
+```bash
+python scripts/evaluate_segmentation.py --all-sessions --tune
+```
+
+Evaluate the tuned/default detector, run the full-dataset CNN on matched detected clips, and save detected clips:
+
+```bash
+python scripts/evaluate_segmentation.py --all-sessions --predict-cnn --extract-clips
+```
+
+What it creates:
+
+```text
+data/metadata/segmentation/all_sessions/segmentation_report.txt
+data/metadata/segmentation/all_sessions/segmentation_report.json
+data/metadata/segmentation/all_sessions/segmentation_matches.csv
+data/metadata/segmentation/all_sessions/segmentation_tuning.json
+data/processed/detected_clips/all_sessions_detected/clip_manifest.csv
+```
+
+This is the bridge between the oracle training pipeline and the live app. It measures detection separately from classification:
+
+```text
+raw audio
+-> detected peaks
+-> match peaks against known keydown times
+-> extract detected clips
+-> classify matched detected clips with the CNN
+```
+
+## Train The Neural Segmenter
+
+Train NN #1 in the two-network pipeline:
+
+```bash
+python scripts/train_neural_segmenter.py --all-sessions
+```
+
+What it learns:
+
+```text
+raw phrase audio window
+-> probability that a keypress is centered in that window
+```
+
+What it creates:
+
+```text
+models/neural_segmenter/all_sessions/model.pt
+models/neural_segmenter/all_sessions/metrics.json
+models/neural_segmenter/all_sessions/training_history.csv
+models/neural_segmenter/all_sessions/test_event_predictions.csv
+models/neural_segmenter/all_sessions/report.txt
+```
+
+Current held-out neural segmenter result:
+
+```text
+No current result yet. The old MacBook-keyboard models were deleted; retrain after collecting Keychron V6 trials.
+```
+
+Use the trained segmenter to turn one raw WAV file into individual clips:
+
+```bash
+python scripts/run_neural_segmenter.py --audio "path/to/typing.wav" --expected-keys 5
+```
+
+This writes detected clips and a manifest here by default:
+
+```text
+data/processed/neural_segments/manual/
+```
+
+## Run The Acoustic CNN Demo
+
+Launch the local browser app that records a short typing audio clip, segments it, and decodes it with the full-dataset CNN after models have been retrained:
+
+```bash
+python scripts/run_acoustic_demo.py
+```
+
+Launch without opening a browser automatically:
+
+```bash
+python scripts/run_acoustic_demo.py --no-open
+```
+
+Use a different model folder:
+
+```bash
+python scripts/run_acoustic_demo.py --model-dir "models/acoustic_cnn/all_sessions"
+```
+
+What it does:
+
+```text
+browser recording
+-> neural segmenter if trained, otherwise heuristic peak detection
+-> fixed windows around detected peaks
+-> log-mel spectrograms
+-> optimized acoustic CNN
+-> predicted string and per-key probabilities
+```
+
+Each decode is saved as:
+
+```text
+data/raw/inference_runs/<run_id>/recording.wav
+data/processed/inference_runs/<run_id>/clips/
+data/processed/inference_runs/<run_id>/clip_manifest.csv
+data/metadata/inference_runs/<run_id>/metadata.json
+```
+
+The browser displays the raw recording and every generated single-key clip with audio controls.
+
+This demo is acoustic-only. It does not use the true typed text, browser key logs, timing features, or language-model correction.
+For best first tests, keep the typed phrase short and set `Expected Keys` to the number of keys you plan to press. The live demo uses that as a hard cap before the CNN runs, which helps prevent one short recording from producing a long sequence of false key detections.

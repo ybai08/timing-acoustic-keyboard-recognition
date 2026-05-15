@@ -2,6 +2,13 @@
 
 Use this as the single continuous path through the project. Each step should be mostly complete before moving to the next one.
 
+## Dataset Reset
+
+- [x] Removed the previous MacBook-keyboard raw data, processed data, metadata, and trained models.
+- [x] Updated the controlled keyboard scope to the Keychron V6 wired mechanical keyboard.
+- [ ] Collect the first fresh Keychron V6 session.
+- [ ] Re-run alignment, clip extraction, spectrogram generation, acoustic CNN training, and neural segmenter training on Keychron V6 data.
+
 ## Working Rule
 
 - [ ] Only use consent-based data.
@@ -16,6 +23,7 @@ Use this as the single continuous path through the project. Each step should be 
 
 - [x] Write the first-scope statement in `README.md`.
 - [x] Confirm the first version uses one keyboard, one microphone, one quiet room, and known prompts.
+- [x] Update the controlled keyboard to the Keychron V6 wired mechanical keyboard.
 - [x] Confirm the first experiment compares acoustic-only vs timing-only vs acoustic + timing.
 - [x] Define what "success" means for the first version.
 
@@ -47,6 +55,7 @@ Done when: a new user can run one command and know whether the project environme
 - [x] Create a prompt file for random character strings.
 - [x] Create a prompt file for synthetic password-like strings.
 - [x] Create a targeted word prompt file for underused acoustic keys.
+- [x] Create a single-letter prompt file for clean isolated-key collection.
 - [x] Add a short note explaining that prompts are synthetic and consent-based.
 
 Done when: the data collector can load prompts from files instead of using manually typed examples.
@@ -121,10 +130,30 @@ Done when: every extracted keystroke clip can become a model-ready spectrogram.
 - [x] Add a browser visualization for the acoustic baseline structure and learned weights.
 - [x] Add an optimized acoustic CNN with class balancing, augmentation, validation, and early stopping.
 - [x] Update the acoustic visualizer so it supports both the logistic baseline and optimized CNN.
+- [x] Add a repeatable full-dataset training path for the optimized CNN across all processed sessions.
 
 Done when: the project has acoustic-only models with saved per-key probabilities.
 
-### 11. Expand Timing Feature Extraction
+### 11. Add Automatic Keystroke Segmentation
+
+- [x] Create `src/keyboard_fusion/segmentation.py`.
+- [x] Compute a click-focused audio envelope.
+- [x] Detect likely keystroke peaks from raw audio.
+- [x] Match detected peaks to known key events for evaluation.
+- [x] Tune detector parameters against aligned sessions.
+- [x] Extract clips from detected peaks under `data/processed/detected_clips/`.
+- [x] Compare oracle segmentation against automatic segmentation.
+- [x] Evaluate the acoustic CNN on matched detected clips.
+- [x] Add a local browser demo that records audio and runs the full-dataset acoustic CNN on detected keypresses.
+- [x] Add an expected-key cap to the live demo so short recordings do not produce long false-positive sequences.
+- [x] Add a neural segmenter that learns raw audio windows -> keypress-center probability from aligned sessions.
+- [x] Train the neural segmenter on all current aligned sessions.
+- [x] Compare heuristic segmentation vs neural segmentation on held-out trials.
+- [x] Save every live demo decode as raw audio, generated clips, a clip manifest, and run metadata.
+
+Done when: the project can measure how much performance drops when true timestamps are not used for clipping.
+
+### 12. Expand Timing Feature Extraction
 
 - [ ] Review `src/keyboard_fusion/timing_features.py`.
 - [ ] Keep dwell time.
@@ -138,7 +167,7 @@ Done when: the project has acoustic-only models with saved per-key probabilities
 
 Done when: each typed sequence has timing features that describe both rhythm and keyboard movement.
 
-### 12. Train A Timing-Only Baseline
+### 13. Train A Timing-Only Baseline
 
 - [ ] Create `src/keyboard_fusion/timing_model.py`.
 - [ ] Start with a simple model such as logistic regression, random forest, or gradient boosting.
@@ -148,7 +177,7 @@ Done when: each typed sequence has timing features that describe both rhythm and
 
 Done when: timing has a measurable baseline, even if it cannot identify exact isolated keys well.
 
-### 13. Build The First Fusion Decoder
+### 14. Build The First Fusion Decoder
 
 - [ ] Create `src/keyboard_fusion/fusion_decoder.py`.
 - [ ] Load acoustic probabilities for each keystroke.
@@ -160,7 +189,7 @@ Done when: timing has a measurable baseline, even if it cannot identify exact is
 
 Done when: the project can decode a typed sequence using acoustic evidence plus timing evidence.
 
-### 14. Evaluate Acoustic-Only vs Fusion
+### 15. Evaluate Acoustic-Only vs Fusion
 
 - [ ] Create `src/keyboard_fusion/evaluation.py`.
 - [ ] Evaluate acoustic-only character accuracy.
@@ -172,7 +201,7 @@ Done when: the project can decode a typed sequence using acoustic evidence plus 
 
 Done when: there is a clear table showing whether timing improves acoustic recovery.
 
-### 15. Study Ambiguous Acoustic Cases
+### 16. Study Ambiguous Acoustic Cases
 
 - [ ] Find cases where acoustic predictions are uncertain.
 - [ ] Find cases where the true key is in the acoustic model's top 5 but not top 1.
@@ -181,17 +210,6 @@ Done when: there is a clear table showing whether timing improves acoustic recov
 - [ ] Write a short analysis in `reports/`.
 
 Done when: the project can explain where timing helps, not just whether it helps overall.
-
-### 16. Add Automatic Keystroke Segmentation
-
-- [ ] Create `src/keyboard_fusion/segmentation.py`.
-- [ ] Compute short-time audio energy.
-- [ ] Detect keystroke peaks.
-- [ ] Match detected peaks to known key events for evaluation.
-- [ ] Extract clips from detected peaks.
-- [ ] Compare oracle segmentation against automatic segmentation.
-
-Done when: the project can measure how much performance drops when true timestamps are not used for clipping.
 
 ### 17. Add Better Acoustic Models
 

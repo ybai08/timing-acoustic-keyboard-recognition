@@ -8,7 +8,7 @@ The initial research question is:
 
 ## Project Status
 
-Current stage: data collection, spectrogram generation, logistic acoustic baseline, and optimized acoustic-only CNN are working. The next major research step is timing feature extraction.
+Current stage: reset for a new Keychron V6 dataset. The previous MacBook-keyboard data and trained models were removed, so `data/` and `models/` are intentionally empty except for placeholders. The pipeline code is ready; the next step is collecting fresh Keychron V6 trials before retraining the acoustic CNN and neural segmenter.
 
 The repo includes:
 
@@ -25,11 +25,9 @@ The first experiment is intentionally narrow and controlled. The goal is to buil
 Target device:
 
 ```text
-Keyboard/computer: current MacBook Air
-Model identifier: Mac14,2
-Model number: MLY13LL/A
-Chip: Apple M2
-Memory: 8 GB
+Keyboard: Keychron V6 wired mechanical keyboard
+Connection: wired USB
+Computer: current MacBook Air used only to run collection/training
 ```
 
 Recording setup:
@@ -45,7 +43,7 @@ Noise control: AC unit off during recording
 First-version constraints:
 
 - one participant: the project owner
-- one keyboard: the built-in keyboard on the current MacBook Air
+- one keyboard: Keychron V6 wired mechanical keyboard
 - one microphone setup: Scarlett Solo USB setup described above
 - one room environment: the user's room with AC off
 - known synthetic prompts only
@@ -216,14 +214,20 @@ python scripts/train_acoustic_baseline.py
 
 This trains the first acoustic-only baseline: logistic regression on flattened normalized log-mel spectrograms. It is intentionally simple so you can measure the pipeline before adding a neural network.
 
-For the stronger acoustic-only model, run:
+For the main stronger acoustic-only model, train across every processed spectrogram session:
 
 ```bash
 source .venv/bin/activate
-python scripts/train_acoustic_cnn.py
+python scripts/train_acoustic_cnn.py --all-sessions
 ```
 
-This trains a compact ResNet-style CNN directly on the `64 x 10` log-mel spectrograms. It uses class-balanced loss, SpecAugment-style frequency/time masking, noise augmentation, mixup, AdamW, a validation split, and early stopping. This is the best acoustic-only model currently in the project; timing and fusion are still separate future steps.
+This creates `data/processed/spectrograms/all_sessions/spectrogram_manifest.csv`, then trains a compact ResNet-style CNN directly on the combined `64 x 10` log-mel spectrograms. It uses class-balanced loss, SpecAugment-style frequency/time masking, noise augmentation, mixup, AdamW, a validation split, and early stopping. This is the best acoustic-only model currently in the project; timing and fusion are still separate future steps.
+
+For a quick per-session comparison, you can still run:
+
+```bash
+python scripts/train_acoustic_cnn.py --session <session_id>
+```
 
 Model outputs are written under `models/acoustic_baseline/<session_id>/`:
 
@@ -235,7 +239,7 @@ test_probabilities.csv
 report.txt
 ```
 
-CNN outputs are written under `models/acoustic_cnn/<session_id>/`:
+CNN outputs are written under `models/acoustic_cnn/<session_id>/`. For the full-dataset run, the session ID is `all_sessions`:
 
 ```text
 model.pt
@@ -248,11 +252,11 @@ report.txt
 
 The predictions file contains top-1 and top-5 guesses for each held-out clip. The probabilities file contains one probability per candidate key for each held-out clip.
 
-To visualize the latest trained acoustic CNN, run:
+To visualize the full-dataset acoustic CNN, run:
 
 ```bash
-python scripts/visualize_acoustic_model.py
-open "models/acoustic_cnn/<session_id>/model_visualization.html"
+python scripts/visualize_acoustic_model.py --session all_sessions
+open "models/acoustic_cnn/all_sessions/model_visualization.html"
 ```
 
 The unified viewer detects whether the model folder contains the logistic baseline or the optimized CNN. For the CNN it shows model structure, training history, a confusion matrix, and held-out prediction probabilities. For the logistic baseline it also shows per-key learned weight heatmaps.
@@ -263,6 +267,86 @@ To visualize the logistic baseline instead:
 python scripts/visualize_acoustic_model.py --kind baseline --session <session_id>
 open "models/acoustic_baseline/<session_id>/model_visualization.html"
 ```
+
+## Evaluating Automatic Segmentation
+
+The acoustic CNN is trained on already-isolated key clips. Before using it on raw audio, evaluate whether the project can find individual keypresses from audio alone:
+
+```bash
+source .venv/bin/activate
+python scripts/evaluate_segmentation.py --all-sessions --predict-cnn --extract-clips
+```
+
+This compares audio-detected peaks against the known keydown times from the data collector, writes a segmentation report, saves a match CSV, and creates detected-peak clips under `data/processed/detected_clips/`.
+
+Current full-dataset result:
+
+```text
+No current result yet. Collect fresh Keychron V6 data, then run this evaluation after retraining.
+```
+
+This means the CNN performs well when the detector finds the correct click. The remaining live-app problem is mostly missed or extra detected keypresses.
+
+## Training The Neural Segmenter
+
+The two-network version of the project adds a neural segmenter before the acoustic CNN:
+
+```text
+raw multi-key audio
+-> neural segmenter predicts keypress centers
+-> fixed clips around those centers
+-> acoustic CNN predicts each key
+-> decoded string
+```
+
+Train the neural segmenter from every aligned trial:
+
+```bash
+source .venv/bin/activate
+python scripts/train_neural_segmenter.py --all-sessions
+```
+
+This uses the existing aligned keydown timestamps as supervised labels. Outputs are written under:
+
+```text
+models/neural_segmenter/all_sessions/
+```
+
+Current held-out result:
+
+```text
+No current result yet. The neural segmenter needs to be retrained on fresh Keychron V6 trials.
+```
+
+To segment one WAV file into individual clips:
+
+```bash
+python scripts/run_neural_segmenter.py --audio "path/to/typing.wav" --expected-keys 5
+```
+
+That writes detected `.wav` clips plus a `clip_manifest.csv` under `data/processed/neural_segments/manual/`.
+
+## Running The Acoustic Demo
+
+After collecting Keychron V6 data and training the full-dataset CNN and neural segmenter, launch the local acoustic-only demo:
+
+```bash
+source .venv/bin/activate
+python scripts/run_acoustic_demo.py
+```
+
+The demo records a short audio clip, uses `models/neural_segmenter/all_sessions/model.pt` when available to detect keystroke clips, classifies each detected clip with `models/acoustic_cnn/all_sessions/model.pt`, and shows the predicted string plus per-key probabilities. It also saves each decode as an inference run:
+
+```text
+data/raw/inference_runs/<run_id>/recording.wav
+data/processed/inference_runs/<run_id>/clips/
+data/processed/inference_runs/<run_id>/clip_manifest.csv
+data/metadata/inference_runs/<run_id>/metadata.json
+```
+
+The browser shows audio controls for the raw recording and each generated single-key clip so you can audit what the neural segmenter produced.
+
+This is still less reliable than the oracle training pipeline because it must detect keypresses from raw audio first. Use synthetic text only, start with short phrases, and set `Expected Keys` to the number of keys you plan to press. The live detector uses that value as a hard cap so small echoes and key-release sounds do not turn a short recording into many extra guesses.
 
 ## Collector Architecture
 

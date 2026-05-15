@@ -18,9 +18,13 @@ from sklearn.preprocessing import StandardScaler
 from keyboard_fusion.paths import MODELS_DIR, PROCESSED_DATA_DIR
 
 
+COMBINED_SESSION_ID = "all_sessions"
+
+
 PREDICTION_COLUMNS = [
     "clip_id",
     "spectrogram_path",
+    "session_id",
     "trial_id",
     "event_index",
     "true_key",
@@ -42,6 +46,7 @@ PREDICTION_COLUMNS = [
 
 PROBABILITY_COLUMNS = [
     "clip_id",
+    "session_id",
     "trial_id",
     "event_index",
     "true_key",
@@ -80,6 +85,89 @@ def find_latest_spectrogram_session(spectrogram_root: Path | None = None) -> Pat
     if not sessions:
         raise FileNotFoundError(f"No spectrogram sessions found under {root}")
     return sessions[-1]
+
+
+def find_spectrogram_manifests(
+    spectrogram_root: Path | None = None,
+    exclude_session_ids: set[str] | None = None,
+) -> list[Path]:
+    root = spectrogram_root or PROCESSED_DATA_DIR / "spectrograms"
+    excluded = {COMBINED_SESSION_ID} | (exclude_session_ids or set())
+    manifests = [
+        session_dir / "spectrogram_manifest.csv"
+        for session_dir in sorted(path for path in root.iterdir() if path.is_dir())
+        if session_dir.name not in excluded and (session_dir / "spectrogram_manifest.csv").exists()
+    ]
+    if not manifests:
+        raise FileNotFoundError(f"No spectrogram manifests found under {root}")
+    return manifests
+
+
+def write_combined_spectrogram_manifest(
+    manifest_paths: list[Path],
+    output_path: Path,
+) -> dict[str, Any]:
+    rows: list[dict[str, str]] = []
+    fieldnames: list[str] = []
+    session_counts: Counter[str] = Counter()
+
+    for manifest_path in manifest_paths:
+        session_rows = load_spectrogram_manifest(manifest_path)
+        source_fieldnames = session_rows[0].keys() if session_rows else []
+        for fieldname in source_fieldnames:
+            if fieldname not in fieldnames:
+                fieldnames.append(fieldname)
+        if "session_id" not in fieldnames:
+            fieldnames.append("session_id")
+
+        for row in session_rows:
+            record = dict(row)
+            session_id = record.get("session_id") or manifest_path.parent.name
+            record["session_id"] = session_id
+            rows.append(record)
+            session_counts[session_id] += 1
+
+    if not rows:
+        raise ValueError("Cannot build a combined manifest from empty source manifests.")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({fieldname: row.get(fieldname, "") for fieldname in fieldnames})
+
+    return {
+        "manifest_count": len(manifest_paths),
+        "total_records": len(rows),
+        "session_counts": dict(sorted(session_counts.items())),
+    }
+
+
+def build_combined_spectrogram_manifest(
+    spectrogram_root: Path | None = None,
+    combined_session_id: str = COMBINED_SESSION_ID,
+) -> tuple[Path, dict[str, Any]]:
+    root = spectrogram_root or PROCESSED_DATA_DIR / "spectrograms"
+    manifest_paths = find_spectrogram_manifests(
+        root,
+        exclude_session_ids={combined_session_id},
+    )
+    output_path = root / combined_session_id / "spectrogram_manifest.csv"
+    summary = write_combined_spectrogram_manifest(manifest_paths, output_path)
+    return output_path, summary
+
+
+def session_id_from_manifest(
+    spectrogram_manifest_path: Path,
+    records: list[dict[str, str]],
+    output_session_id: str | None = None,
+) -> str:
+    if output_session_id:
+        return output_session_id
+    if spectrogram_manifest_path.parent.name:
+        return spectrogram_manifest_path.parent.name
+    return records[0].get("session_id", "unknown_session")
 
 
 def load_spectrogram_array(path: Path) -> np.ndarray:
@@ -194,6 +282,7 @@ def build_prediction_records(
         prediction_row: dict[str, Any] = {
             "clip_id": record.get("clip_id", ""),
             "spectrogram_path": record.get("spectrogram_path", ""),
+            "session_id": record.get("session_id", ""),
             "trial_id": record.get("trial_id", ""),
             "event_index": record.get("event_index", ""),
             "true_key": true_key,
@@ -216,6 +305,7 @@ def build_prediction_records(
             probability_rows.append(
                 {
                     "clip_id": record.get("clip_id", ""),
+                    "session_id": record.get("session_id", ""),
                     "trial_id": record.get("trial_id", ""),
                     "event_index": record.get("event_index", ""),
                     "true_key": true_key,
@@ -304,6 +394,7 @@ def build_text_report(metrics: dict[str, Any], y_test: np.ndarray, y_pred: np.nd
 def train_acoustic_baseline(
     spectrogram_manifest_path: Path,
     output_root: Path | None = None,
+    output_session_id: str | None = None,
     test_size: float = 0.2,
     random_seed: int = 42,
     max_iter: int = 2000,
@@ -334,7 +425,7 @@ def train_acoustic_baseline(
         probabilities=probabilities,
     )
 
-    session_id = records[0].get("session_id", spectrogram_manifest_path.parent.name)
+    session_id = session_id_from_manifest(spectrogram_manifest_path, records, output_session_id)
     output_base = output_root or MODELS_DIR / "acoustic_baseline"
     output_dir = output_base / session_id
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -2,12 +2,13 @@ project_name: timing_acoustic_keyboard_recognition
 
 hardware:
   keyboard:
-    computer_model: MacBook Air
-    model_identifier: Mac14,2
-    model_number: MLY13LL/A
-    chip: Apple M2
-    memory_gb: 8
-    keyboard_type: built-in laptop keyboard
+    computer_model: external keyboard experiment
+    model_identifier: Keychron V6
+    model_number: Keychron V6 wired mechanical keyboard
+    chip: n/a
+    memory_gb: n/a
+    keyboard_type: wired mechanical keyboard
+    connection: wired USB
   microphone:
     name: Scarlett Solo USB microphone/interface setup
     pattern: 360-degree/omnidirectional
@@ -35,6 +36,25 @@ segmentation:
   mode: oracle
   pre_keydown_ms: 20
   post_keydown_ms: 45
+
+neural_segmenter:
+  sample_rate: 24000
+  window_ms: 75
+  hop_ms: 5
+  min_gap_ms: 75
+  threshold: 0.5
+  tolerance_ms: 35
+  max_peak_multiplier: 1.0
+  negative_ratio: 1.5
+  positive_jitters_per_event: 1
+  positive_jitter_ms: 3
+  negative_exclusion_ms: 45
+  epochs: 25
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.01
+  patience: 7
+  dropout: 0.25
 
 features:
   mel_bands: 64
