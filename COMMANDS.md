@@ -236,7 +236,7 @@ models/acoustic_cnn/<session_id>/training_history.csv
 models/acoustic_cnn/<session_id>/report.txt
 ```
 
-The optimized acoustic model is a compact ResNet-style CNN over the `64 x 10` spectrogram image. It uses class-balanced loss, light SpecAugment-style masking, small noise augmentation, AdamW, validation, and early stopping. This stays acoustic-only; it does not use timing or fusion features.
+The optimized acoustic model is a compact ResNet-style CNN over the `64 x 10` spectrogram image. It uses class-balanced loss, SpecAugment-style masking, noise augmentation, mixup, AdamW, validation, and early stopping. This stays acoustic-only; it does not use timing or fusion features.
 
 ## Visualize The Logistic Acoustic Baseline
 

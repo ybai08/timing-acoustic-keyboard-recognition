@@ -223,7 +223,7 @@ source .venv/bin/activate
 python scripts/train_acoustic_cnn.py
 ```
 
-This trains a compact ResNet-style CNN directly on the `64 x 10` log-mel spectrograms. It uses class-balanced loss, light SpecAugment-style frequency/time masking, small noise augmentation, AdamW, a validation split, and early stopping. This is the best acoustic-only model currently in the project; timing and fusion are still separate future steps.
+This trains a compact ResNet-style CNN directly on the `64 x 10` log-mel spectrograms. It uses class-balanced loss, SpecAugment-style frequency/time masking, noise augmentation, mixup, AdamW, a validation split, and early stopping. This is the best acoustic-only model currently in the project; timing and fusion are still separate future steps.
 
 Model outputs are written under `models/acoustic_baseline/<session_id>/`:
 

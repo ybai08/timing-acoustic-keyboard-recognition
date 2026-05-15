@@ -50,16 +50,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Fraction of the training split used for early-stopping validation.",
     )
     parser.add_argument("--random-seed", type=int, default=int(experiment_config.get("random_seed", 42)))
-    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--epochs", type=int, default=220)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--learning-rate", type=float, default=0.001)
-    parser.add_argument("--weight-decay", type=float, default=0.01)
-    parser.add_argument("--patience", type=int, default=35)
-    parser.add_argument("--dropout", type=float, default=0.25)
-    parser.add_argument("--mixup-alpha", type=float, default=0.0)
-    parser.add_argument("--frequency-mask-width", type=int, default=4)
-    parser.add_argument("--time-mask-width", type=int, default=1)
-    parser.add_argument("--noise-std", type=float, default=0.01)
+    parser.add_argument("--weight-decay", type=float, default=0.02)
+    parser.add_argument("--patience", type=int, default=45)
+    parser.add_argument("--dropout", type=float, default=0.4)
+    parser.add_argument("--mixup-alpha", type=float, default=0.2)
+    parser.add_argument("--frequency-mask-width", type=int, default=8)
+    parser.add_argument("--time-mask-width", type=int, default=2)
+    parser.add_argument("--noise-std", type=float, default=0.025)
     parser.add_argument(
         "--device",
         default="auto",
