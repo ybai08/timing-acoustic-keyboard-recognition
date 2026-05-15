@@ -85,12 +85,12 @@ Done when: the project can reliably locate where each keypress should appear in 
 
 ### 8. Implement Oracle Keystroke Extraction
 
-- [ ] Create `src/keyboard_fusion/preprocessing.py`.
-- [ ] Load one trial's audio and metadata.
-- [ ] For each keydown timestamp, cut a fixed window around the keypress.
-- [ ] Save extracted clips under `data/processed/`.
-- [ ] Save clip metadata with key label, trial ID, start time, and end time.
-- [ ] Add tests for clip window calculations.
+- [x] Create `src/keyboard_fusion/preprocessing.py`.
+- [x] Load one trial's audio and metadata.
+- [x] For each keydown timestamp, cut a fixed window around the keypress.
+- [x] Save extracted clips under `data/processed/`.
+- [x] Save clip metadata with key label, trial ID, start time, and end time.
+- [x] Add tests for clip window calculations.
 
 Done when: known keydown timestamps can produce labeled single-key audio clips.
 
@@ -277,4 +277,4 @@ Done when: the repository is clean, reproducible, and ready to share privately.
 
 ## Current Next Step
 
-- [ ] Start with Step 7: add audio/event alignment checks.
+- [ ] Start with Step 9: build log-mel spectrogram generation from extracted clips.

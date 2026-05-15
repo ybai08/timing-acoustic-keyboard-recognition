@@ -156,6 +156,27 @@ trial_001_alignment.json
 alignment_report.txt
 ```
 
+## Extracting Keystroke Clips
+
+After alignment, run:
+
+```bash
+source .venv/bin/activate
+python scripts/extract_clips.py
+```
+
+This cuts one labeled `.wav` clip for every aligned non-repeat `keydown` event. For the current oracle baseline, each clip uses the configured extraction window around the true keydown timestamp.
+
+Clip outputs are written under `data/processed/clips/<session_id>/`:
+
+```text
+trial_001/trial_001_event_000_keyh_h.wav
+clip_manifest.csv
+clip_extraction_report.txt
+```
+
+The manifest is the important index for training later: it connects each clip path to the key label, trial ID, prompt, keydown time, and sample window.
+
 ## Collector Architecture
 
 There is one collection launcher:
