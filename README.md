@@ -147,7 +147,7 @@ source .venv/bin/activate
 python scripts/align_trials.py
 ```
 
-This maps every non-repeat `keydown` event to a WAV sample index and a fixed extraction window using the shared browser trial clock. The first version uses the browser's `trial_elapsed_seconds` timestamps rather than a beep marker; a marker can be added later if you need tighter audio-clock calibration.
+This maps every non-repeat `keydown` event to a WAV sample index and a fixed extraction window. The browser key log and WAV stream can start a little out of sync, so the alignment step estimates a per-trial audio offset from waveform energy before creating sample windows. A beep marker can still be added later if you need tighter audio-clock calibration.
 
 Alignment outputs are written under `data/metadata/alignment/<session_id>/`:
 
@@ -165,7 +165,7 @@ source .venv/bin/activate
 python scripts/extract_clips.py
 ```
 
-This cuts one labeled `.wav` clip for every aligned non-repeat `keydown` event. For the current oracle baseline, each clip uses the configured extraction window around the true keydown timestamp.
+This cuts one labeled `.wav` clip for every aligned non-repeat `keydown` event. For the current oracle baseline, each clip uses the configured extraction window around the offset-corrected true keydown timestamp. The default window is intentionally short, `20 ms` before keydown through `45 ms` after keydown, to reduce neighboring keys leaking into the same clip.
 
 Clip outputs are written under `data/processed/clips/<session_id>/`:
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import csv
 import json
+import statistics
+import struct
 import wave
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,7 +12,7 @@ from typing import Any
 from keyboard_fusion.paths import METADATA_DIR, RAW_DATA_DIR
 
 
-ALIGNMENT_METHOD = "shared_browser_trial_clock_v1"
+ALIGNMENT_METHOD = "audio_energy_offset_v2"
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,31 @@ def read_wav_info(path: Path) -> WavInfo:
             frame_count=wav_file.getnframes(),
             sample_width_bytes=wav_file.getsampwidth(),
         )
+
+
+def read_wav_mono_samples(path: Path) -> tuple[WavInfo, list[int]]:
+    """Read a WAV as mono integer samples for lightweight energy analysis."""
+    with wave.open(str(path), "rb") as wav_file:
+        wav_info = WavInfo(
+            sample_rate=wav_file.getframerate(),
+            channels=wav_file.getnchannels(),
+            frame_count=wav_file.getnframes(),
+            sample_width_bytes=wav_file.getsampwidth(),
+        )
+        raw = wav_file.readframes(wav_info.frame_count)
+
+    if wav_info.sample_width_bytes != 2:
+        raise ValueError("Only 16-bit PCM WAV files are supported for alignment offset estimation.")
+
+    values = struct.unpack("<" + "h" * (len(raw) // 2), raw)
+    if wav_info.channels == 1:
+        return wav_info, list(values)
+
+    mono_samples: list[int] = []
+    for index in range(0, len(values), wav_info.channels):
+        frame = values[index : index + wav_info.channels]
+        mono_samples.append(int(sum(frame) / len(frame)))
+    return wav_info, mono_samples
 
 
 def load_events_csv(path: Path) -> list[dict[str, str]]:
@@ -76,16 +103,135 @@ def keydown_events(events: list[dict[str, Any]], include_repeats: bool = False) 
     ]
 
 
+def build_energy_envelope(
+    samples: list[int],
+    sample_rate: int,
+    hop_ms: float = 2.0,
+    frame_ms: float = 8.0,
+) -> tuple[list[float], int]:
+    """Build a robust short-time absolute-energy envelope."""
+    hop_samples = max(1, int(round(sample_rate * hop_ms / 1000)))
+    frame_samples = max(1, int(round(sample_rate * frame_ms / 1000)))
+    envelope: list[float] = []
+    for start in range(0, len(samples), hop_samples):
+        frame = samples[start : start + frame_samples]
+        if not frame:
+            break
+        envelope.append(sum(abs(sample) for sample in frame) / len(frame))
+
+    if not envelope:
+        return [], hop_samples
+
+    median = statistics.median(envelope)
+    mad = statistics.median(abs(value - median) for value in envelope) or 1.0
+    normalized = [max(0.0, (value - median) / mad) for value in envelope]
+    return normalized, hop_samples
+
+
+def score_audio_offset(
+    envelope: list[float],
+    hop_samples: int,
+    sample_rate: int,
+    keydown_times_seconds: list[float],
+    offset_seconds: float,
+    search_radius_ms: float = 25.0,
+) -> float:
+    """Score how well shifted keydown times land on audio energy peaks."""
+    if not envelope:
+        return float("-inf")
+
+    radius_frames = max(1, int(round(sample_rate * search_radius_ms / 1000 / hop_samples)))
+    scores: list[float] = []
+    outside_count = 0
+
+    for keydown_time in keydown_times_seconds:
+        audio_time = keydown_time - offset_seconds
+        if audio_time < 0:
+            outside_count += 1
+            continue
+        center = int(round(audio_time * sample_rate / hop_samples))
+        if center >= len(envelope):
+            outside_count += 1
+            continue
+        start = max(0, center - radius_frames)
+        end = min(len(envelope), center + radius_frames + 1)
+        local_scores = [
+            value * (1.0 - (abs(index - center) / (radius_frames + 1) * 0.5))
+            for index, value in enumerate(envelope[start:end], start=start)
+        ]
+        scores.append(max(local_scores))
+
+    if not scores:
+        return float("-inf")
+    return statistics.mean(scores) - (outside_count * 5.0)
+
+
+def estimate_audio_start_offset(
+    samples: list[int],
+    sample_rate: int,
+    keydown_times_seconds: list[float],
+    metadata_minus_wav_duration_seconds: float,
+    step_seconds: float = 0.001,
+) -> dict[str, Any]:
+    """Estimate how far the WAV clock starts after the browser trial clock.
+
+    The browser key log uses `trial_elapsed_seconds`, but ScriptProcessor audio
+    chunks can begin after that clock starts. This searches for the shift that
+    makes keydown timestamps land on high-energy audio regions.
+    """
+    if not keydown_times_seconds:
+        return {
+            "mode": "audio_energy_search",
+            "offset_seconds": 0.0,
+            "score": 0.0,
+            "search_start_seconds": 0.0,
+            "search_end_seconds": 0.0,
+            "step_seconds": step_seconds,
+        }
+
+    envelope, hop_samples = build_energy_envelope(samples, sample_rate)
+    first_keydown = min(keydown_times_seconds)
+    duration_based_guess = max(0.0, metadata_minus_wav_duration_seconds)
+    search_end = min(
+        max(0.0, first_keydown - 0.005),
+        max(0.5, duration_based_guess + 0.75),
+    )
+    if search_end <= 0:
+        search_end = min(0.25, max(keydown_times_seconds))
+
+    best_offset = 0.0
+    best_score = float("-inf")
+    steps = max(1, int(round(search_end / step_seconds)))
+    for step in range(steps + 1):
+        offset = min(search_end, step * step_seconds)
+        score = score_audio_offset(envelope, hop_samples, sample_rate, keydown_times_seconds, offset)
+        if score > best_score:
+            best_score = score
+            best_offset = offset
+
+    return {
+        "mode": "audio_energy_search",
+        "offset_seconds": round(best_offset, 9),
+        "score": round(best_score, 6),
+        "search_start_seconds": 0.0,
+        "search_end_seconds": round(search_end, 9),
+        "step_seconds": step_seconds,
+        "metadata_minus_wav_duration_seconds": round(metadata_minus_wav_duration_seconds, 9),
+    }
+
+
 def align_keydown_event(
     event: dict[str, Any],
     sample_rate: int,
     frame_count: int,
     pre_keydown_ms: float,
     post_keydown_ms: float,
+    audio_start_offset_seconds: float = 0.0,
 ) -> dict[str, Any]:
     """Map one keydown event timestamp to a WAV sample index and extraction window."""
     keydown_time_seconds = _parse_float(event.get("trial_elapsed_seconds"))
-    sample_index = int(round(keydown_time_seconds * sample_rate))
+    audio_time_seconds = keydown_time_seconds - audio_start_offset_seconds
+    sample_index = int(round(audio_time_seconds * sample_rate))
     pre_samples = int(round(sample_rate * pre_keydown_ms / 1000))
     post_samples = int(round(sample_rate * post_keydown_ms / 1000))
 
@@ -102,6 +248,8 @@ def align_keydown_event(
         "char": event.get("char", ""),
         "code": event.get("code", ""),
         "keydown_time_seconds": round(keydown_time_seconds, 9),
+        "audio_time_seconds": round(audio_time_seconds, 9),
+        "audio_start_offset_seconds": round(audio_start_offset_seconds, 9),
         "sample_index": sample_index,
         "window_start_sample": window_start_sample,
         "window_end_sample": window_end_sample,
@@ -124,9 +272,19 @@ def align_trial(
     session_dir = metadata_path.parent
     audio_path = session_dir / str(metadata["audio_file_path"])
     events_path = session_dir / str(metadata["events_file_path"])
-    wav_info = read_wav_info(audio_path)
+    wav_info, samples = read_wav_mono_samples(audio_path)
     events = load_events_csv(events_path)
     keydowns = keydown_events(events)
+    metadata_duration = _parse_float(metadata.get("duration_seconds"))
+    metadata_minus_wav = metadata_duration - wav_info.duration_seconds
+    keydown_trial_times = [_parse_float(event.get("trial_elapsed_seconds")) for event in keydowns]
+    offset_estimate = estimate_audio_start_offset(
+        samples=samples,
+        sample_rate=wav_info.sample_rate,
+        keydown_times_seconds=keydown_trial_times,
+        metadata_minus_wav_duration_seconds=metadata_minus_wav,
+    )
+    audio_start_offset_seconds = float(offset_estimate["offset_seconds"])
     keydown_alignments = [
         align_keydown_event(
             event,
@@ -134,23 +292,29 @@ def align_trial(
             wav_info.frame_count,
             pre_keydown_ms,
             post_keydown_ms,
+            audio_start_offset_seconds,
         )
         for event in keydowns
     ]
     outside_audio_count = sum(1 for item in keydown_alignments if not item["within_audio"])
     clipped_count = sum(1 for item in keydown_alignments if item["clipped_left"] or item["clipped_right"])
+    next_key_overlap_count = sum(
+        1
+        for current, following in zip(keydown_alignments, keydown_alignments[1:])
+        if following["audio_time_seconds"] < current["window_end_seconds"]
+    )
     keydown_times = [item["keydown_time_seconds"] for item in keydown_alignments]
-    metadata_duration = _parse_float(metadata.get("duration_seconds"))
 
     return {
-        "alignment_version": 1,
+        "alignment_version": 2,
         "alignment_method": ALIGNMENT_METHOD,
         "alignment_assumption": (
-            "WAV sample 0 is treated as approximately equal to trial_elapsed_seconds=0 "
-            "from the browser Start Trial click. This is good enough for oracle-window "
-            "experiments, but a beep or impulse marker can be added later for tighter "
-            "audio-clock calibration."
+            "WAV sample 0 can start after browser trial_elapsed_seconds=0. The alignment "
+            "therefore estimates an audio_start_offset_seconds value by searching for the "
+            "shift that places logged keydown times on high-energy audio regions. A beep "
+            "or impulse marker can be added later for tighter calibration."
         ),
+        "offset_estimate": offset_estimate,
         "session_id": metadata.get("session_id"),
         "trial_id": metadata.get("trial_id"),
         "participant_id": metadata.get("participant_id"),
@@ -172,9 +336,17 @@ def align_trial(
         "trial_timing": {
             "metadata_duration_seconds": metadata_duration,
             "wav_duration_seconds": round(wav_info.duration_seconds, 9),
-            "metadata_minus_wav_duration_seconds": round(metadata_duration - wav_info.duration_seconds, 9),
+            "metadata_minus_wav_duration_seconds": round(metadata_minus_wav, 9),
             "first_keydown_seconds": min(keydown_times) if keydown_times else None,
             "last_keydown_seconds": max(keydown_times) if keydown_times else None,
+            "first_keydown_audio_seconds": min(
+                (item["audio_time_seconds"] for item in keydown_alignments),
+                default=None,
+            ),
+            "last_keydown_audio_seconds": max(
+                (item["audio_time_seconds"] for item in keydown_alignments),
+                default=None,
+            ),
         },
         "window": {
             "pre_keydown_ms": pre_keydown_ms,
@@ -188,6 +360,7 @@ def align_trial(
             "aligned_keydown_events": len(keydown_alignments),
             "outside_audio_keydown_events": outside_audio_count,
             "clipped_window_events": clipped_count,
+            "next_key_overlap_windows": next_key_overlap_count,
         },
         "keydown_alignments": keydown_alignments,
     }
@@ -216,8 +389,8 @@ def build_session_report(alignments: list[dict[str, Any]]) -> str:
         "",
         f"Method: {ALIGNMENT_METHOD}",
         (
-            "Assumption: WAV sample 0 approximately matches trial_elapsed_seconds=0 "
-            "from the browser Start Trial click."
+            "Assumption: WAV sample 0 may start after browser trial_elapsed_seconds=0; "
+            "the script estimates that offset from audio energy."
         ),
         "",
     ]
@@ -227,6 +400,7 @@ def build_session_report(alignments: list[dict[str, Any]]) -> str:
         timing = alignment["trial_timing"]
         counts = alignment["event_counts"]
         window = alignment["window"]
+        offset = alignment["offset_estimate"]
         lines.extend(
             [
                 f"{alignment['trial_id']} ({alignment['prompt_set']} #{int(alignment['prompt_index']) + 1})",
@@ -243,15 +417,21 @@ def build_session_report(alignments: list[dict[str, Any]]) -> str:
                     f"{timing['metadata_minus_wav_duration_seconds']:.3f}s"
                 ),
                 (
+                    "Estimated audio start offset: "
+                    f"{offset['offset_seconds']:.3f}s "
+                    f"(score {offset['score']:.2f})"
+                ),
+                (
                     f"Keydowns: {counts['aligned_keydown_events']} aligned, "
                     f"{counts['outside_audio_keydown_events']} outside audio, "
-                    f"{counts['clipped_window_events']} clipped windows"
+                    f"{counts['clipped_window_events']} clipped windows, "
+                    f"{counts['next_key_overlap_windows']} overlap next key"
                 ),
                 (
                     f"Window: {window['pre_keydown_ms']} ms before to "
                     f"{window['post_keydown_ms']} ms after keydown"
                 ),
-                "idx  key      code        time_s    sample    window_s",
+                "idx  key      code       trial_s  audio_s   sample    window_s",
             ]
         )
         for item in alignment["keydown_alignments"]:
@@ -259,7 +439,8 @@ def build_session_report(alignments: list[dict[str, Any]]) -> str:
             clipped = " clipped" if item["clipped_left"] or item["clipped_right"] else ""
             lines.append(
                 f"{item['event_index']:>3}  {key:<8} {item['code']:<10} "
-                f"{item['keydown_time_seconds']:>7.3f}  {item['sample_index']:>8}  "
+                f"{item['keydown_time_seconds']:>7.3f}  {item['audio_time_seconds']:>7.3f}  "
+                f"{item['sample_index']:>8}  "
                 f"{item['window_start_seconds']:>7.3f}-{item['window_end_seconds']:<7.3f}"
                 f"{clipped}"
             )

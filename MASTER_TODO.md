@@ -76,7 +76,7 @@ Done when: every trial has matching keyboard events and an audio file path.
 
 ### 7. Add Audio/Event Alignment
 
-- [x] Decide whether the first alignment method uses a beep marker or shared local timestamps.
+- [x] Decide whether the first alignment method uses a beep marker, shared local timestamps, or audio-energy offset estimation.
 - [x] Create an alignment script that maps keydown timestamps to audio time.
 - [x] Save alignment metadata for each trial.
 - [x] Add a small visual or text report showing keydown times against audio windows.

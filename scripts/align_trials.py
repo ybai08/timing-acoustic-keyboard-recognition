@@ -57,11 +57,14 @@ def main(argv: list[str] | None = None) -> int:
     for alignment in alignments:
         counts = alignment["event_counts"]
         timing = alignment["trial_timing"]
+        offset = alignment["offset_estimate"]
         print(
             f"- {alignment['trial_id']}: "
             f"{counts['aligned_keydown_events']} keydowns, "
             f"{counts['outside_audio_keydown_events']} outside audio, "
             f"{counts['clipped_window_events']} clipped, "
+            f"{counts['next_key_overlap_windows']} next-key overlaps, "
+            f"offset={offset['offset_seconds']:.3f}s, "
             f"typed_match={alignment['typed_matches_prompt']}, "
             f"wav={timing['wav_duration_seconds']:.3f}s"
         )
