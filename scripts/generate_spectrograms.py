@@ -42,7 +42,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mel-bands", type=int, default=int(feature_config.get("mel_bands", 64)))
     parser.add_argument("--fft-window-size", type=int, default=int(feature_config.get("fft_window_size", 1024)))
     parser.add_argument("--hop-length", type=int, default=int(feature_config.get("hop_length", 256)))
-    parser.add_argument("--preview-count", type=int, default=12)
+    parser.add_argument(
+        "--preview-count",
+        type=int,
+        default=0,
+        help="Number of clips to include in the preview HTML. Use 0 for all clips, which is the default.",
+    )
     args = parser.parse_args(argv)
 
     clip_manifest_path = resolve_clip_manifest(args.session, args.clip_manifest)

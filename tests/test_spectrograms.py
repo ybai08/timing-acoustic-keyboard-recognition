@@ -6,6 +6,7 @@ import wave
 import numpy as np
 
 from keyboard_fusion.spectrograms import (
+    build_preview_payload,
     generate_session_spectrograms,
     keydown_position_in_clip,
     log_mel_spectrogram,
@@ -80,6 +81,49 @@ def test_keydown_position_uses_audio_time_not_browser_time() -> None:
     assert 0.30 < position < 0.31
 
 
+def test_preview_payload_groups_all_keys_by_trial() -> None:
+    spectrogram = np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32)
+    samples = np.array([0.0, 0.5, -0.5, 0.0], dtype=np.float32)
+    previews = [
+        (
+            {
+                "clip_id": "trial_002_event_001_keyb_b",
+                "trial_id": "trial_002",
+                "event_index": "1",
+                "key": "b",
+                "code": "KeyB",
+                "keydown_position_in_clip": "0.5",
+                "window_duration_seconds": "0.1",
+                "prompt_text": "ab",
+            },
+            spectrogram,
+            samples,
+        ),
+        (
+            {
+                "clip_id": "trial_001_event_000_keya_a",
+                "trial_id": "trial_001",
+                "event_index": "0",
+                "key": "a",
+                "code": "KeyA",
+                "keydown_position_in_clip": "0.25",
+                "window_duration_seconds": "0.1",
+                "prompt_text": "a",
+            },
+            spectrogram,
+            samples,
+        ),
+    ]
+
+    payload = build_preview_payload(previews)
+
+    assert payload["trialCount"] == 2
+    assert payload["clipCount"] == 2
+    assert [trial["trialId"] for trial in payload["trials"]] == ["trial_001", "trial_002"]
+    assert payload["trials"][0]["items"][0]["key"] == "a"
+    assert payload["trials"][1]["items"][0]["keydownMs"] == 50.0
+
+
 def test_generate_session_spectrograms_writes_outputs(tmp_path) -> None:
     session_dir = tmp_path / "clips" / "session_001" / "trial_001"
     session_dir.mkdir(parents=True)
@@ -146,6 +190,10 @@ def test_generate_session_spectrograms_writes_outputs(tmp_path) -> None:
     assert spectrogram_manifest_path.exists()
     assert report_path.exists()
     assert preview_path.exists()
+    preview_html = preview_path.read_text(encoding="utf-8")
+    assert 'id="trialSelect"' in preview_html
+    assert 'id="preview-data"' in preview_html
+    assert "drawSpectrogram" in preview_html
     spectrogram_path = tmp_path / "spectrograms" / "session_001" / "trial_001" / "trial_001_event_000_keya_a_logmel.npz"
     assert spectrogram_path.exists()
     loaded = np.load(spectrogram_path)

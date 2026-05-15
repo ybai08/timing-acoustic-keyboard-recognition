@@ -102,6 +102,7 @@ Done when: known keydown timestamps can produce labeled single-key audio clips.
 - [x] Save spectrogram arrays or images under `data/processed/`.
 - [x] Add a script to generate spectrograms for all clips.
 - [x] Add a quick notebook or report view to inspect a few spectrograms.
+- [x] Add a trial-selectable preview for waveform plus spectrogram diagnostics.
 
 Done when: every extracted keystroke clip can become a model-ready spectrogram.
 

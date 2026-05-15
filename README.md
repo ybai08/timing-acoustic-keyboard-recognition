@@ -105,6 +105,8 @@ Optional later, for PyTorch-based acoustic models:
 python -m pip install -r requirements-ml.txt
 ```
 
+For a fuller command reference, see [COMMANDS.md](COMMANDS.md).
+
 ## Collecting A Trial
 
 Run the browser-based local collection app from the project folder:
@@ -197,7 +199,7 @@ spectrogram_report.txt
 spectrogram_preview.html
 ```
 
-Each `.npz` file contains `spectrogram`, the normalized model input, and `log_mel`, the unnormalized log-mel values. Open the preview HTML to inspect a few generated waveform and spectrogram pairs; the yellow vertical line marks the logged keydown position inside each clip.
+Each `.npz` file contains `spectrogram`, the normalized model input, and `log_mel`, the unnormalized log-mel values. Open the preview HTML to choose a trial and inspect every generated waveform and spectrogram pair for that trial; the yellow vertical line marks the logged keydown position inside each clip.
 
 ## Collector Architecture
 

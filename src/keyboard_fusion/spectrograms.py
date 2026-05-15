@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-import html
+import json
 from pathlib import Path
 from typing import Any
 import wave
@@ -343,77 +343,499 @@ def spectrogram_to_svg(
     )
 
 
-def build_preview_html(previews: list[tuple[dict[str, Any], np.ndarray, np.ndarray]]) -> str:
-    cards: list[str] = []
-    for record, spectrogram, samples in previews:
-        key = "Space" if record.get("key") == " " else str(record.get("key", ""))
-        title = html.escape(f"{record['clip_id']} | key={key}")
+def key_label_for_record(record: dict[str, Any]) -> str:
+    key = str(record.get("key") or "")
+    if key == " ":
+        return "Space"
+    return key or str(record.get("code") or "Unknown")
+
+
+def event_index_for_record(record: dict[str, Any]) -> int:
+    try:
+        return int(record.get("event_index", 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def spectrogram_preview_grid(spectrogram: np.ndarray) -> list[list[float]]:
+    """Return a small normalized 0..1 grid that browser canvas can draw."""
+    values = spectrogram.astype(np.float32)
+    if values.size == 0:
+        return [[0.0]]
+
+    minimum = float(np.min(values))
+    maximum = float(np.max(values))
+    if maximum - minimum < 1e-8:
+        scaled = np.zeros_like(values, dtype=np.float32)
+    else:
+        scaled = ((values - minimum) / (maximum - minimum)).astype(np.float32)
+    return [[round(float(value), 4) for value in row] for row in scaled]
+
+
+def waveform_preview_peaks(samples: np.ndarray, columns: int = 180) -> list[list[float]]:
+    """Downsample a waveform into normalized min/max columns for preview drawing."""
+    values = samples.astype(np.float32)
+    if values.size == 0:
+        return [[0.0, 0.0]]
+
+    column_count = min(max(columns, 1), int(values.size))
+    peak = float(np.max(np.abs(values))) or 1.0
+    peaks: list[list[float]] = []
+    for column in range(column_count):
+        start = int(column * values.size / column_count)
+        end = int((column + 1) * values.size / column_count)
+        chunk = values[start:max(end, start + 1)]
+        peaks.append(
+            [
+                round(float(np.min(chunk)) / peak, 4),
+                round(float(np.max(chunk)) / peak, 4),
+            ]
+        )
+    return peaks
+
+
+def build_preview_payload(previews: list[tuple[dict[str, Any], np.ndarray, np.ndarray]]) -> dict[str, Any]:
+    trials: dict[str, dict[str, Any]] = {}
+    sorted_previews = sorted(previews, key=lambda item: (str(item[0].get("trial_id", "")), event_index_for_record(item[0])))
+
+    for record, spectrogram, samples in sorted_previews:
+        trial_id = str(record.get("trial_id") or "unknown_trial")
+        trial = trials.setdefault(
+            trial_id,
+            {
+                "trialId": trial_id,
+                "promptSet": str(record.get("prompt_set") or ""),
+                "promptIndex": str(record.get("prompt_index") or ""),
+                "promptText": str(record.get("prompt_text") or ""),
+                "items": [],
+            },
+        )
+
         marker_fraction = parse_float(record.get("keydown_position_in_clip"))
-        keydown_ms = marker_fraction * parse_float(record.get("window_duration_seconds"), 0.065) * 1000
-        subtitle = html.escape(
-            f"{record['trial_id']} | keydown at {keydown_ms:.1f} ms | "
-            f"spectrogram={spectrogram.shape}"
-        )
-        cards.append(
-            "<section>"
-            f"<h2>{title}</h2>"
-            f"<p>{subtitle}</p>"
-            '<div class="label-row"><span>Waveform</span><span>yellow line = logged keydown</span></div>'
-            f"{waveform_to_svg(samples, marker_fraction)}"
-            '<div class="label-row"><span>Log-mel spectrogram</span><span>same keydown marker</span></div>'
-            f"{spectrogram_to_svg(spectrogram, marker_fraction)}"
-            "</section>"
-        )
+        window_duration_seconds = parse_float(record.get("window_duration_seconds"), 0.065)
+        item = {
+            "clipId": str(record.get("clip_id") or ""),
+            "eventIndex": event_index_for_record(record),
+            "key": key_label_for_record(record),
+            "code": str(record.get("code") or ""),
+            "char": str(record.get("char") or ""),
+            "keydownMs": round(marker_fraction * window_duration_seconds * 1000, 2),
+            "marker": round(marker_fraction, 5),
+            "frames": int(spectrogram.shape[1]) if spectrogram.ndim == 2 else 0,
+            "shape": [int(size) for size in spectrogram.shape],
+            "waveform": waveform_preview_peaks(samples),
+            "spectrogram": spectrogram_preview_grid(spectrogram),
+        }
+        trial["items"].append(item)
+
+    trial_list = list(trials.values())
+    for trial in trial_list:
+        trial["keyCount"] = len(trial["items"])
+        trial["keySequence"] = " ".join(str(item["key"]) for item in trial["items"])
+
+    return {
+        "trialCount": len(trial_list),
+        "clipCount": sum(len(trial["items"]) for trial in trial_list),
+        "trials": trial_list,
+    }
+
+
+def build_preview_html(previews: list[tuple[dict[str, Any], np.ndarray, np.ndarray]]) -> str:
+    payload = build_preview_payload(previews)
+    payload_json = json.dumps(payload, separators=(",", ":"))
+    payload_json = (
+        payload_json.replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+    )
 
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Spectrogram Preview</title>
   <style>
+    :root {{
+      color-scheme: dark;
+      --bg: #090b10;
+      --panel: #111722;
+      --panel-strong: #151d2b;
+      --line: #263244;
+      --line-soft: rgba(154, 168, 188, 0.18);
+      --text: #edf3ff;
+      --muted: #9aa8bc;
+      --accent: #49a5ff;
+      --marker: #ffcc66;
+    }}
+    * {{ box-sizing: border-box; }}
     body {{
-      background: #090b10;
-      color: #edf3ff;
+      background: var(--bg);
+      color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       margin: 0;
-      padding: 24px;
+      min-width: 320px;
     }}
-    main {{
+    .shell {{
       display: grid;
       gap: 16px;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      padding: 24px;
     }}
-    h1 {{ font-size: 24px; margin: 0 0 18px; }}
-    section {{
-      background: #111722;
-      border: 1px solid #263244;
+    header {{
+      align-items: end;
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+    }}
+    h1 {{
+      font-size: clamp(24px, 3vw, 34px);
+      line-height: 1.05;
+      margin: 0;
+    }}
+    .summary {{
+      color: var(--muted);
+      font-size: 14px;
+      margin: 8px 0 0;
+    }}
+    label {{
+      color: var(--muted);
+      display: grid;
+      font-size: 12px;
+      font-weight: 700;
+      gap: 7px;
+      min-width: min(340px, 100%);
+      text-transform: uppercase;
+    }}
+    select {{
+      appearance: none;
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      min-height: 42px;
+      padding: 12px;
+    }}
+    .trial-panel {{
+      background: linear-gradient(180deg, rgba(73, 165, 255, 0.08), rgba(73, 165, 255, 0.02));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: grid;
+      gap: 14px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: 14px;
+    }}
+    .eyebrow {{
+      color: var(--muted);
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }}
+    .prompt-text {{
+      font-size: 15px;
+      line-height: 1.4;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }}
+    .stats {{
+      align-items: center;
+      display: flex;
+      gap: 10px;
+    }}
+    .stat {{
+      background: rgba(9, 11, 16, 0.46);
+      border: 1px solid var(--line-soft);
+      border-radius: 8px;
+      min-width: 92px;
+      padding: 9px 10px;
+    }}
+    .stat strong {{
+      display: block;
+      font-size: 20px;
+      line-height: 1;
+    }}
+    .stat span {{
+      color: var(--muted);
+      display: block;
+      font-size: 11px;
+      margin-top: 4px;
+    }}
+    .key-strip {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }}
+    .key-chip {{
+      background: #151d2b;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1;
+      min-width: 28px;
+      padding: 7px 8px;
+      text-align: center;
+    }}
+    .cards {{
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }}
+    .card {{
+      background: var(--panel);
+      border: 1px solid var(--line);
       border-radius: 8px;
       padding: 12px;
     }}
-    h2 {{ font-size: 13px; margin: 0 0 4px; overflow-wrap: anywhere; }}
-    p {{ color: #9aa8bc; font-size: 12px; margin: 0 0 10px; }}
+    .card h2 {{
+      font-size: 13px;
+      line-height: 1.25;
+      margin: 0 0 4px;
+      overflow-wrap: anywhere;
+    }}
+    .card p {{
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      margin: 0 0 10px;
+    }}
     .label-row {{
-      color: #9aa8bc;
+      color: var(--muted);
       display: flex;
       font-size: 11px;
+      gap: 10px;
       justify-content: space-between;
       margin: 10px 0 5px;
-      gap: 10px;
     }}
-    svg {{
+    canvas {{
+      background: #05070b;
+      border: 1px solid var(--line-soft);
       display: block;
       width: 100%;
-      height: auto;
-      background: #05070b;
-      border: 1px solid rgba(154,168,188,0.18);
+    }}
+    .waveform {{ height: 76px; }}
+    .spectrogram {{ height: 142px; }}
+    .empty {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      padding: 20px;
+    }}
+    @media (max-width: 720px) {{
+      .shell {{ padding: 16px; }}
+      header {{ align-items: stretch; flex-direction: column; }}
+      .trial-panel {{ grid-template-columns: 1fr; }}
+      .stats {{ align-items: stretch; }}
     }}
   </style>
 </head>
 <body>
-  <h1>Spectrogram Preview</h1>
-  <main>
-    {''.join(cards)}
-  </main>
+  <div class="shell">
+    <header>
+      <div>
+        <h1>Spectrogram Preview</h1>
+        <p class="summary" id="summary">Loading preview data...</p>
+      </div>
+      <label for="trialSelect">
+        Trial
+        <select id="trialSelect"></select>
+      </label>
+    </header>
+
+    <section class="trial-panel" aria-label="selected trial summary">
+      <div>
+        <span class="eyebrow">Prompt</span>
+        <p class="prompt-text" id="promptText"></p>
+      </div>
+      <div class="stats">
+        <div class="stat"><strong id="keyCount">0</strong><span>keys</span></div>
+        <div class="stat"><strong id="trialNumber">-</strong><span>trial</span></div>
+      </div>
+    </section>
+
+    <div class="key-strip" id="keyStrip" aria-label="keys pressed in the selected trial"></div>
+    <main class="cards" id="cards"></main>
+  </div>
+
+  <script id="preview-data" type="application/json">{payload_json}</script>
+  <script>
+    const data = JSON.parse(document.getElementById("preview-data").textContent);
+    const summary = document.getElementById("summary");
+    const select = document.getElementById("trialSelect");
+    const promptText = document.getElementById("promptText");
+    const keyCount = document.getElementById("keyCount");
+    const trialNumber = document.getElementById("trialNumber");
+    const keyStrip = document.getElementById("keyStrip");
+    const cards = document.getElementById("cards");
+    let selectedIndex = 0;
+    let resizeTimer = null;
+
+    function drawMarker(ctx, marker, width, height) {{
+      const x = Math.max(0, Math.min(1, marker || 0)) * width;
+      ctx.strokeStyle = "#ffcc66";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }}
+
+    function setupCanvas(canvas, height) {{
+      const width = Math.max(260, Math.floor(canvas.clientWidth || 260));
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      return {{ ctx, width, height }};
+    }}
+
+    function drawWaveform(canvas, waveform, marker) {{
+      const {{ ctx, width, height }} = setupCanvas(canvas, 76);
+      ctx.fillStyle = "#05070b";
+      ctx.fillRect(0, 0, width, height);
+      const center = height / 2;
+      const usable = height * 0.42;
+      ctx.strokeStyle = "rgba(154, 168, 188, 0.35)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, center);
+      ctx.lineTo(width, center);
+      ctx.stroke();
+      ctx.strokeStyle = "#49a5ff";
+      ctx.beginPath();
+      waveform.forEach((pair, index) => {{
+        const x = (index + 0.5) * width / waveform.length;
+        const min = Number(pair[0]) || 0;
+        const max = Number(pair[1]) || 0;
+        ctx.moveTo(x, center - max * usable);
+        ctx.lineTo(x, center - min * usable);
+      }});
+      ctx.stroke();
+      drawMarker(ctx, marker, width, height);
+    }}
+
+    function heatColor(value) {{
+      const v = Math.max(0, Math.min(1, Number(value) || 0));
+      const lightness = 12 + v * 72;
+      return `hsl(185 85% ${{lightness}}%)`;
+    }}
+
+    function drawSpectrogram(canvas, grid, marker) {{
+      const {{ ctx, width, height }} = setupCanvas(canvas, 142);
+      ctx.fillStyle = "#05070b";
+      ctx.fillRect(0, 0, width, height);
+      const rows = grid.length;
+      const cols = rows ? grid[0].length : 0;
+      if (!rows || !cols) {{
+        drawMarker(ctx, marker, width, height);
+        return;
+      }}
+      const cellWidth = width / cols;
+      const cellHeight = height / rows;
+      for (let row = 0; row < rows; row += 1) {{
+        for (let col = 0; col < cols; col += 1) {{
+          ctx.fillStyle = heatColor(grid[row][col]);
+          ctx.fillRect(col * cellWidth, height - (row + 1) * cellHeight, cellWidth + 0.5, cellHeight + 0.5);
+        }}
+      }}
+      drawMarker(ctx, marker, width, height);
+    }}
+
+    function makeText(tag, className, text) {{
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      element.textContent = text;
+      return element;
+    }}
+
+    function makeCard(item) {{
+      const card = document.createElement("section");
+      card.className = "card";
+      card.appendChild(makeText("h2", "", `${{item.clipId}} | key=${{item.key}}`));
+      card.appendChild(makeText("p", "", `event ${{item.eventIndex}} | keydown at ${{item.keydownMs.toFixed(1)}} ms | shape=(${{item.shape.join(", ")}})`));
+
+      const waveLabel = document.createElement("div");
+      waveLabel.className = "label-row";
+      waveLabel.appendChild(makeText("span", "", "Waveform"));
+      waveLabel.appendChild(makeText("span", "", "yellow line = logged keydown"));
+      card.appendChild(waveLabel);
+
+      const waveform = document.createElement("canvas");
+      waveform.className = "waveform";
+      waveform.dataset.kind = "waveform";
+      card.appendChild(waveform);
+
+      const specLabel = document.createElement("div");
+      specLabel.className = "label-row";
+      specLabel.appendChild(makeText("span", "", "Log-mel spectrogram"));
+      specLabel.appendChild(makeText("span", "", "same keydown marker"));
+      card.appendChild(specLabel);
+
+      const spectrogram = document.createElement("canvas");
+      spectrogram.className = "spectrogram";
+      spectrogram.dataset.kind = "spectrogram";
+      card.appendChild(spectrogram);
+      return {{ card, waveform, spectrogram }};
+    }}
+
+    function renderTrial(index) {{
+      selectedIndex = index;
+      const trial = data.trials[index];
+      cards.textContent = "";
+      keyStrip.textContent = "";
+      if (!trial) {{
+        cards.appendChild(makeText("p", "empty", "No preview data is available."));
+        return;
+      }}
+
+      promptText.textContent = trial.promptText || "No prompt text saved.";
+      keyCount.textContent = String(trial.keyCount || trial.items.length);
+      trialNumber.textContent = trial.trialId.replace("trial_", "");
+
+      trial.items.forEach((item) => {{
+        const chip = makeText("span", "key-chip", item.key);
+        keyStrip.appendChild(chip);
+      }});
+
+      const canvases = [];
+      trial.items.forEach((item) => {{
+        const preview = makeCard(item);
+        cards.appendChild(preview.card);
+        canvases.push([item, preview.waveform, preview.spectrogram]);
+      }});
+      requestAnimationFrame(() => {{
+        canvases.forEach(([item, waveform, spectrogram]) => {{
+          drawWaveform(waveform, item.waveform, item.marker);
+          drawSpectrogram(spectrogram, item.spectrogram, item.marker);
+        }});
+      }});
+    }}
+
+    function initialize() {{
+      summary.textContent = `${{data.clipCount}} clips across ${{data.trialCount}} trials`;
+      data.trials.forEach((trial, index) => {{
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = `${{trial.trialId}} - ${{trial.keyCount}} keys`;
+        select.appendChild(option);
+      }});
+      select.addEventListener("change", () => renderTrial(Number(select.value)));
+      renderTrial(0);
+    }}
+
+    window.addEventListener("resize", () => {{
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => renderTrial(selectedIndex), 120);
+    }});
+
+    initialize();
+  </script>
 </body>
 </html>
 """
@@ -453,7 +875,7 @@ def generate_session_spectrograms(
     mel_bands: int = 64,
     fft_window_size: int = 1024,
     hop_length: int = 256,
-    preview_count: int = 12,
+    preview_count: int = 0,
 ) -> tuple[list[dict[str, Any]], Path, Path, Path]:
     """Generate model-ready log-mel spectrogram arrays for every clip in a manifest."""
     clip_records = load_clip_manifest(clip_manifest_path)
@@ -475,7 +897,7 @@ def generate_session_spectrograms(
             hop_length=hop_length,
         )
         records.append(spectrogram_record)
-        if len(previews) < preview_count:
+        if preview_count <= 0 or len(previews) < preview_count:
             _, samples = read_wav_mono_float(Path(spectrogram_record["clip_audio_path"]))
             previews.append((spectrogram_record, spectrogram, samples))
 
