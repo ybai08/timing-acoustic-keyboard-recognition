@@ -248,14 +248,21 @@ report.txt
 
 The predictions file contains top-1 and top-5 guesses for each held-out clip. The probabilities file contains one probability per candidate key for each held-out clip.
 
-To visualize the trained logistic-regression baseline, run:
+To visualize the latest trained acoustic CNN, run:
 
 ```bash
 python scripts/visualize_acoustic_model.py
-open "models/acoustic_baseline/<session_id>/model_visualization.html"
+open "models/acoustic_cnn/<session_id>/model_visualization.html"
 ```
 
-The viewer shows the logistic model structure, learned per-key acoustic weights, a confusion matrix, and held-out prediction probabilities. The CNN currently writes `metrics.json`, `training_history.csv`, `test_predictions.csv`, `test_probabilities.csv`, and `report.txt`.
+The unified viewer detects whether the model folder contains the logistic baseline or the optimized CNN. For the CNN it shows model structure, training history, a confusion matrix, and held-out prediction probabilities. For the logistic baseline it also shows per-key learned weight heatmaps.
+
+To visualize the logistic baseline instead:
+
+```bash
+python scripts/visualize_acoustic_model.py --kind baseline --session <session_id>
+open "models/acoustic_baseline/<session_id>/model_visualization.html"
+```
 
 ## Collector Architecture
 

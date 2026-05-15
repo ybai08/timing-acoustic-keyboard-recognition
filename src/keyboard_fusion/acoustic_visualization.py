@@ -28,6 +28,22 @@ def find_latest_acoustic_baseline_session(model_root: Path | None = None) -> Pat
     return sessions[-1]
 
 
+def find_latest_acoustic_cnn_session(model_root: Path | None = None) -> Path:
+    root = model_root or MODELS_DIR / "acoustic_cnn"
+    sessions = sorted(path for path in root.iterdir() if path.is_dir())
+    if not sessions:
+        raise FileNotFoundError(f"No acoustic CNN sessions found under {root}")
+    return sessions[-1]
+
+
+def find_latest_acoustic_model_session(kind: str = "cnn") -> Path:
+    if kind == "baseline":
+        return find_latest_acoustic_baseline_session()
+    if kind == "cnn":
+        return find_latest_acoustic_cnn_session()
+    raise ValueError("kind must be 'baseline' or 'cnn'")
+
+
 def parse_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
@@ -56,10 +72,7 @@ def weight_heatmaps(model: Any, feature_shape: list[int]) -> list[dict[str, Any]
     for index, key in enumerate(classes):
         if index >= coefficients.shape[0]:
             break
-        if len(shape) == 1:
-            weights = coefficients[index].reshape(1, shape[0])
-        else:
-            weights = coefficients[index].reshape(shape)
+        weights = coefficients[index].reshape(shape if len(shape) > 1 else (1, shape[0]))
         heatmaps.append(
             {
                 "key": key,
@@ -102,7 +115,11 @@ def prediction_payload(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
 
 
 def confusion_payload(predictions: list[dict[str, Any]], classes: list[str]) -> dict[str, Any]:
-    labels = sorted(set(classes) | {row["trueKey"] for row in predictions} | {row["predictedKey"] for row in predictions})
+    labels = sorted(
+        set(classes)
+        | {row["trueKey"] for row in predictions}
+        | {row["predictedKey"] for row in predictions}
+    )
     index_by_label = {label: index for index, label in enumerate(labels)}
     matrix = [[0 for _ in labels] for _ in labels]
     for row in predictions:
@@ -112,11 +129,48 @@ def confusion_payload(predictions: list[dict[str, Any]], classes: list[str]) -> 
     return {"labels": labels, "matrix": matrix}
 
 
-def build_visualization_payload(model_dir: Path) -> dict[str, Any]:
-    model = joblib.load(model_dir / "model.joblib")
-    metrics = read_json(model_dir / "metrics.json")
-    prediction_rows = read_csv(model_dir / "test_predictions.csv")
+def training_history_payload(path: Path) -> list[dict[str, float | int]]:
+    if not path.exists():
+        return []
 
+    rows: list[dict[str, float | int]] = []
+    for row in read_csv(path):
+        rows.append(
+            {
+                "epoch": parse_int(row.get("epoch")),
+                "trainLoss": parse_float(row.get("train_loss")),
+                "trainAccuracy": parse_float(row.get("train_accuracy")),
+                "validationLoss": parse_float(row.get("validation_loss")),
+                "validationAccuracy": parse_float(row.get("validation_accuracy")),
+                "learningRate": parse_float(row.get("learning_rate")),
+            }
+        )
+    return rows
+
+
+def logistic_pipeline(feature_shape: list[int], input_features: int, scaler_features: int, output_classes: int) -> list[dict[str, str]]:
+    return [
+        {"name": "Log-mel spectrogram", "detail": " x ".join(str(value) for value in feature_shape)},
+        {"name": "Flatten", "detail": f"{input_features} numeric input features"},
+        {"name": "StandardScaler", "detail": f"Normalize {scaler_features} features"},
+        {"name": "LogisticRegression", "detail": f"{output_classes} key probability outputs"},
+    ]
+
+
+def cnn_pipeline(metrics: dict[str, Any]) -> list[dict[str, str]]:
+    architecture = metrics.get("architecture", {})
+    layers = architecture.get("layers", [])
+    if layers:
+        return [{"name": f"Stage {index + 1}", "detail": str(layer)} for index, layer in enumerate(layers)]
+    return [
+        {"name": "Log-mel spectrogram", "detail": " x ".join(str(value) for value in metrics.get("feature_shape", []))},
+        {"name": "ResNet-style CNN", "detail": "Residual convolution blocks with squeeze-excite"},
+        {"name": "Dense classifier", "detail": f"{metrics.get('class_count', 0)} key probability outputs"},
+    ]
+
+
+def build_logistic_payload(model_dir: Path, metrics: dict[str, Any], prediction_rows: list[dict[str, str]]) -> dict[str, Any]:
+    model = joblib.load(model_dir / "model.joblib")
     classifier = model.named_steps["classifier"]
     scaler = model.named_steps["scale"]
     classes = [str(label) for label in classifier.classes_]
@@ -130,6 +184,7 @@ def build_visualization_payload(model_dir: Path) -> dict[str, Any]:
     return {
         "architecture": {
             "sessionId": metrics.get("session_id", model_dir.name),
+            "modelKind": "baseline",
             "modelType": metrics.get("model_type", "logistic_regression_flattened_log_mel"),
             "isNeuralNetwork": False,
             "inputShape": feature_shape,
@@ -140,19 +195,65 @@ def build_visualization_payload(model_dir: Path) -> dict[str, Any]:
             "weightMatrixShape": [int(value) for value in classifier.coef_.shape],
             "interceptShape": [int(value) for value in classifier.intercept_.shape],
             "trainableParameters": trainable_parameters,
-            "pipeline": [
-                {"name": "Log-mel spectrogram", "detail": " x ".join(str(value) for value in feature_shape)},
-                {"name": "Flatten", "detail": f"{input_features} numeric input features"},
-                {"name": "StandardScaler", "detail": f"Normalize {int(getattr(scaler, 'n_features_in_', input_features))} features"},
-                {"name": "LogisticRegression", "detail": f"{len(classes)} key probability outputs"},
-            ],
+            "pipeline": logistic_pipeline(
+                feature_shape=feature_shape,
+                input_features=input_features,
+                scaler_features=int(getattr(scaler, "n_features_in_", input_features)),
+                output_classes=len(classes),
+            ),
         },
         "metrics": metrics,
         "classes": classes,
         "weightHeatmaps": weight_heatmaps(model, feature_shape),
+        "history": [],
         "predictions": predictions,
         "confusion": confusion_payload(predictions, classes),
     }
+
+
+def build_cnn_payload(model_dir: Path, metrics: dict[str, Any], prediction_rows: list[dict[str, str]]) -> dict[str, Any]:
+    architecture = metrics.get("architecture", {})
+    classes = [str(label) for label in metrics.get("classes", [])]
+    if not classes:
+        classes = sorted({row.get("true_key", "") for row in prediction_rows} | {row.get("predicted_key", "") for row in prediction_rows})
+    feature_shape = [int(value) for value in metrics.get("feature_shape", [])]
+    input_shape = [int(value) for value in architecture.get("input_shape", [1, *feature_shape])]
+    input_features = int(np.prod(input_shape)) if input_shape else int(np.prod(feature_shape))
+    predictions = prediction_payload(prediction_rows)
+
+    return {
+        "architecture": {
+            "sessionId": metrics.get("session_id", model_dir.name),
+            "modelKind": "cnn",
+            "modelType": metrics.get("model_type", "acoustic_spectrogram_resnet"),
+            "isNeuralNetwork": True,
+            "inputShape": input_shape,
+            "inputFeatures": input_features,
+            "hiddenLayers": len(architecture.get("layers", [])),
+            "hiddenNeurons": 128,
+            "outputClasses": int(metrics.get("class_count", len(classes))),
+            "weightMatrixShape": [],
+            "interceptShape": [],
+            "trainableParameters": int(architecture.get("trainable_parameters", 0)),
+            "pipeline": cnn_pipeline(metrics),
+        },
+        "metrics": metrics,
+        "classes": classes,
+        "weightHeatmaps": [],
+        "history": training_history_payload(model_dir / "training_history.csv"),
+        "predictions": predictions,
+        "confusion": confusion_payload(predictions, classes),
+    }
+
+
+def build_visualization_payload(model_dir: Path) -> dict[str, Any]:
+    metrics = read_json(model_dir / "metrics.json")
+    prediction_rows = read_csv(model_dir / "test_predictions.csv")
+    model_type = str(metrics.get("model_type", ""))
+
+    if model_type == "acoustic_spectrogram_resnet" or (model_dir / "model.pt").exists():
+        return build_cnn_payload(model_dir, metrics, prediction_rows)
+    return build_logistic_payload(model_dir, metrics, prediction_rows)
 
 
 def html_template() -> str:
@@ -242,11 +343,13 @@ def html_template() -> str:
       align-items: stretch;
       display: grid;
       gap: 10px;
-      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      max-height: 380px;
+      overflow: auto;
+      padding-right: 4px;
     }
     .model-step {
       padding: 13px;
-      position: relative;
     }
     .model-step strong {
       display: block;
@@ -291,7 +394,7 @@ def html_template() -> str:
       height: 270px;
       width: 100%;
     }
-    .heatmap-meta {
+    .meta {
       color: var(--muted);
       display: flex;
       flex-wrap: wrap;
@@ -319,6 +422,10 @@ def html_template() -> str:
     th {
       color: var(--muted);
       font-weight: 700;
+    }
+    .scroll-table {
+      max-height: 520px;
+      overflow: auto;
     }
     .prediction-list {
       display: grid;
@@ -350,12 +457,8 @@ def html_template() -> str:
       padding: 4px 7px;
       white-space: nowrap;
     }
-    .pill.good {
-      color: var(--green);
-    }
-    .pill.bad {
-      color: var(--red);
-    }
+    .pill.good { color: var(--green); }
+    .pill.bad { color: var(--red); }
     .bars {
       display: grid;
       gap: 5px;
@@ -377,13 +480,12 @@ def html_template() -> str:
       background: linear-gradient(90deg, var(--blue), var(--green));
       height: 100%;
     }
-    .muted {
-      color: var(--muted);
-    }
+    .muted { color: var(--muted); }
+    .hidden { display: none; }
     @media (max-width: 900px) {
       .shell { padding: 16px; }
       header { align-items: stretch; flex-direction: column; }
-      .architecture, .two-column { grid-template-columns: 1fr; }
+      .two-column { grid-template-columns: 1fr; }
       canvas { height: 220px; }
     }
   </style>
@@ -407,19 +509,19 @@ def html_template() -> str:
     <section class="two-column">
       <div class="panel">
         <div class="controls">
-          <h2>Per-Key Weight Heatmap</h2>
-          <label for="keySelect">
+          <h2 id="diagnosticTitle">Model Diagnostic</h2>
+          <label for="keySelect" id="keySelectLabel">
             Key
             <select id="keySelect"></select>
           </label>
         </div>
-        <canvas id="heatmap"></canvas>
-        <div class="heatmap-meta" id="heatmapMeta"></div>
+        <canvas id="diagnosticCanvas"></canvas>
+        <div class="meta" id="diagnosticMeta"></div>
       </div>
 
       <div class="panel">
         <h2>Confusion Matrix</h2>
-        <div id="confusion"></div>
+        <div class="scroll-table" id="confusion"></div>
       </div>
     </section>
 
@@ -445,12 +547,20 @@ def html_template() -> str:
     const summary = document.getElementById("summary");
     const stats = document.getElementById("stats");
     const architecture = document.getElementById("architecture");
+    const diagnosticTitle = document.getElementById("diagnosticTitle");
+    const keySelectLabel = document.getElementById("keySelectLabel");
     const keySelect = document.getElementById("keySelect");
-    const heatmap = document.getElementById("heatmap");
-    const heatmapMeta = document.getElementById("heatmapMeta");
+    const diagnosticCanvas = document.getElementById("diagnosticCanvas");
+    const diagnosticMeta = document.getElementById("diagnosticMeta");
     const confusion = document.getElementById("confusion");
     const predictionFilter = document.getElementById("predictionFilter");
     const predictionList = document.getElementById("predictionList");
+
+    function formatNumber(value) {
+      if (typeof value !== "number" || !Number.isFinite(value)) return value || "0";
+      if (Math.abs(value) >= 1000) return value.toLocaleString();
+      return String(value);
+    }
 
     function addStat(value, label) {
       const card = document.createElement("div");
@@ -466,13 +576,15 @@ def html_template() -> str:
     function renderStats() {
       const a = data.architecture;
       const m = data.metrics;
-      summary.textContent = `${a.sessionId} | current baseline: logistic regression, not a neural network`;
-      addStat(a.inputFeatures, "input features from the spectrogram");
-      addStat(a.hiddenNeurons, "hidden neurons in this baseline");
+      const kindLabel = a.isNeuralNetwork ? "optimized acoustic CNN" : "logistic acoustic baseline";
+      summary.textContent = `${a.sessionId} | ${kindLabel} | ${a.modelType}`;
+      addStat(a.inputShape.join(" x "), "input shape");
       addStat(a.outputClasses, "key classes predicted");
-      addStat(a.trainableParameters.toLocaleString(), "trainable weights + intercepts");
+      addStat(formatNumber(a.trainableParameters), "trainable parameters");
       addStat(Number(m.top1_accuracy).toFixed(3), "top-1 held-out accuracy");
       addStat(Number(m.top5_accuracy).toFixed(3), "top-5 held-out accuracy");
+      if (m.validation_count !== undefined) addStat(m.validation_count, "validation clips");
+      addStat(m.test_count, "test clips");
     }
 
     function renderArchitecture() {
@@ -488,15 +600,6 @@ def html_template() -> str:
       });
     }
 
-    function heatColor(value, maxAbs) {
-      if (!maxAbs) return "hsl(210 18% 10%)";
-      const intensity = Math.min(1, Math.abs(value) / maxAbs);
-      if (value >= 0) {
-        return `hsl(188 82% ${12 + intensity * 66}%)`;
-      }
-      return `hsl(28 92% ${13 + intensity * 56}%)`;
-    }
-
     function setupCanvas(canvas) {
       const width = Math.max(320, Math.floor(canvas.clientWidth || 320));
       const height = Math.max(220, Math.floor(canvas.clientHeight || 220));
@@ -509,9 +612,16 @@ def html_template() -> str:
       return { ctx, width, height };
     }
 
+    function heatColor(value, maxAbs) {
+      if (!maxAbs) return "hsl(210 18% 10%)";
+      const intensity = Math.min(1, Math.abs(value) / maxAbs);
+      if (value >= 0) return `hsl(188 82% ${12 + intensity * 66}%)`;
+      return `hsl(28 92% ${13 + intensity * 56}%)`;
+    }
+
     function drawHeatmap(index) {
       const item = data.weightHeatmaps[index];
-      const { ctx, width, height } = setupCanvas(heatmap);
+      const { ctx, width, height } = setupCanvas(diagnosticCanvas);
       const rows = item.weights.length;
       const cols = item.weights[0].length;
       const maxAbs = Math.max(Math.abs(item.minimum), Math.abs(item.maximum));
@@ -523,18 +633,63 @@ def html_template() -> str:
           ctx.fillRect(col * cellWidth, height - (row + 1) * cellHeight, cellWidth + 0.5, cellHeight + 0.5);
         }
       }
-      heatmapMeta.textContent = `Key ${item.key}: positive cyan cells push the model toward this key; amber cells push away. Weight range ${item.minimum} to ${item.maximum}.`;
+      diagnosticMeta.textContent = `Key ${item.key}: cyan pushes toward this key; amber pushes away. Weight range ${item.minimum} to ${item.maximum}.`;
     }
 
-    function renderKeySelect() {
-      data.weightHeatmaps.forEach((item, index) => {
-        const option = document.createElement("option");
-        option.value = String(index);
-        option.textContent = item.key;
-        keySelect.appendChild(option);
+    function drawLine(ctx, points, color, width, height, minY, maxY, valueKey) {
+      if (points.length < 2) return;
+      const range = Math.max(1e-9, maxY - minY);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        const x = 38 + (index / Math.max(1, points.length - 1)) * (width - 54);
+        const y = 16 + (1 - ((point[valueKey] - minY) / range)) * (height - 44);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       });
-      keySelect.addEventListener("change", () => drawHeatmap(Number(keySelect.value)));
-      drawHeatmap(0);
+      ctx.stroke();
+    }
+
+    function drawTrainingHistory() {
+      const history = data.history || [];
+      const { ctx, width, height } = setupCanvas(diagnosticCanvas);
+      ctx.strokeStyle = "rgba(154, 168, 188, 0.25)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(38, 16);
+      ctx.lineTo(38, height - 28);
+      ctx.lineTo(width - 16, height - 28);
+      ctx.stroke();
+      if (!history.length) {
+        ctx.fillStyle = "#9aa8bc";
+        ctx.fillText("No training history saved for this model.", 52, 52);
+        diagnosticMeta.textContent = "Training history is unavailable.";
+        return;
+      }
+      drawLine(ctx, history, "#68d391", width, height, 0, 1, "trainAccuracy");
+      drawLine(ctx, history, "#49a5ff", width, height, 0, 1, "validationAccuracy");
+      const best = history.reduce((current, item) => item.validationAccuracy > current.validationAccuracy ? item : current, history[0]);
+      diagnosticMeta.textContent = `Training history: green=train accuracy, blue=validation accuracy. Best validation accuracy ${best.validationAccuracy.toFixed(3)} at epoch ${best.epoch}.`;
+    }
+
+    function renderDiagnostic() {
+      if (data.weightHeatmaps.length) {
+        diagnosticTitle.textContent = "Per-Key Weight Heatmap";
+        keySelectLabel.classList.remove("hidden");
+        data.weightHeatmaps.forEach((item, index) => {
+          const option = document.createElement("option");
+          option.value = String(index);
+          option.textContent = item.key;
+          keySelect.appendChild(option);
+        });
+        keySelect.addEventListener("change", () => drawHeatmap(Number(keySelect.value)));
+        drawHeatmap(0);
+      } else {
+        diagnosticTitle.textContent = "CNN Training History";
+        keySelectLabel.classList.add("hidden");
+        drawTrainingHistory();
+      }
     }
 
     function renderConfusion() {
@@ -619,13 +774,16 @@ def html_template() -> str:
     let resizeTimer = null;
     window.addEventListener("resize", () => {
       window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(() => drawHeatmap(Number(keySelect.value || 0)), 120);
+      resizeTimer = window.setTimeout(() => {
+        if (data.weightHeatmaps.length) drawHeatmap(Number(keySelect.value || 0));
+        else drawTrainingHistory();
+      }, 120);
     });
     predictionFilter.addEventListener("change", renderPredictions);
 
     renderStats();
     renderArchitecture();
-    renderKeySelect();
+    renderDiagnostic();
     renderConfusion();
     renderPredictions();
   </script>

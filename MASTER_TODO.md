@@ -119,6 +119,7 @@ Done when: every extracted keystroke clip can become a model-ready spectrogram.
 - [x] Report top-1 and top-5 key accuracy.
 - [x] Add a browser visualization for the acoustic baseline structure and learned weights.
 - [x] Add an optimized acoustic CNN with class balancing, augmentation, validation, and early stopping.
+- [x] Update the acoustic visualizer so it supports both the logistic baseline and optimized CNN.
 
 Done when: the project has acoustic-only models with saved per-key probabilities.
 

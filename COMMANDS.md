@@ -238,27 +238,36 @@ models/acoustic_cnn/<session_id>/report.txt
 
 The optimized acoustic model is a compact ResNet-style CNN over the `64 x 10` spectrogram image. It uses class-balanced loss, SpecAugment-style masking, noise augmentation, mixup, AdamW, validation, and early stopping. This stays acoustic-only; it does not use timing or fusion features.
 
-## Visualize The Logistic Acoustic Baseline
+## Visualize Acoustic Models
 
-Generate a browser-based model visualization for the latest acoustic baseline:
+Generate a browser-based visualization for the latest optimized acoustic CNN:
 
 ```bash
 python scripts/visualize_acoustic_model.py
 ```
 
-Generate it for a specific session:
+Generate it for a specific CNN session:
 
 ```bash
-python scripts/visualize_acoustic_model.py --session session_20260514_185847
+python scripts/visualize_acoustic_model.py --session session_20260514_230910
 ```
 
-Open the visualization:
+Open the CNN visualization:
 
 ```bash
-open "models/acoustic_baseline/session_20260514_185847/model_visualization.html"
+open "models/acoustic_cnn/session_20260514_230910/model_visualization.html"
 ```
 
-This viewer is for the logistic-regression baseline, not the CNN. Its structure is:
+The unified viewer detects the model type. For the optimized CNN, it shows architecture, training history, a confusion matrix, and held-out prediction probabilities.
+
+Generate the logistic-regression baseline visualization instead:
+
+```bash
+python scripts/visualize_acoustic_model.py --kind baseline --session session_20260514_230910
+open "models/acoustic_baseline/session_20260514_230910/model_visualization.html"
+```
+
+The logistic baseline structure is:
 
 ```text
 64 x 10 log-mel spectrogram
@@ -268,13 +277,4 @@ This viewer is for the logistic-regression baseline, not the CNN. Its structure 
 -> one probability for each key class
 ```
 
-The visualization shows this structure, a per-key learned weight heatmap, a confusion matrix, and held-out prediction probabilities.
-
-For the optimized CNN, inspect these files instead:
-
-```text
-models/acoustic_cnn/<session_id>/metrics.json
-models/acoustic_cnn/<session_id>/training_history.csv
-models/acoustic_cnn/<session_id>/test_predictions.csv
-models/acoustic_cnn/<session_id>/report.txt
-```
+For the logistic baseline, the viewer also shows per-key learned weight heatmaps.
