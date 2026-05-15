@@ -46,6 +46,7 @@ Done when: a new user can run one command and know whether the project environme
 - [x] Create a prompt file for short English phrases.
 - [x] Create a prompt file for random character strings.
 - [x] Create a prompt file for synthetic password-like strings.
+- [x] Create a targeted word prompt file for underused acoustic keys.
 - [x] Add a short note explaining that prompts are synthetic and consent-based.
 
 Done when: the data collector can load prompts from files instead of using manually typed examples.
